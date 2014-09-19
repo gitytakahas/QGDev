@@ -13,7 +13,7 @@ Making a new qgMiniTuple
 
 Macros
 ------
-Compile them with **g++ -O3 -I `root-config --incdir` -o $1 $1.C `root-config --libs` s-td=c++0x** with $1 the executable
+Compile them with **g++ -O3 -I \`root-config --incdir\` -o $1 $1.C \`root-config --libs\` s-td=c++0x** with $1 the executable
 * **createPDF**: creates the ROOT files with the pdf's
 * **plotDistributions**: plots distributions of axis2, ptD, mult and qg-likelihood
 * **plotDistributions**: plots ROC curves

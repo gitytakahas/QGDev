@@ -17,7 +17,8 @@
 
 
 int main(int argc, char**argv){
-  TString stackOption = "";		// other option: "noStack"
+  bool overlay = true;
+  bool norm = true;
 
   // Define binning for plots
   std::vector<float> etaBins 	= {0,2.5,4.7};
@@ -30,11 +31,10 @@ int main(int argc, char**argv){
   printBins("rho", rhoBins); std::cout << std::endl;
 
   // For different samples and jet types
-//  for(TString file : {"VBF_HToBB_M-125_13TeV-powheg-pythia6","EWKZjj_mqq120_mll50_13TeV_madgraph-pythia8","QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8"}){
-  for(TString file : {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8"}){
+  for(TString file : {"VBF_HToBB_M-125_13TeV-powheg-pythia6","EWKZjj_mqq120_mll50_13TeV_madgraph-pythia8","QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8"}){
     for(TString jetType : {"AK4","AK4chs","AK5","AK5chs"}){
       std::cout << "Making plots for " << jetType << " in file " << file << "..." << std::endl;
-      system("rm -r plots/distributions/" + file + "/" + jetType);
+      system("rm -rf plots/distributions/" + file + "/" + jetType);
       for(TString var: {"axis2","ptD","mult","qg"}) system("mkdir -p plots/distributions/" + file + "/" + jetType + "/" + var);
 
       // Init qgMiniTuple
@@ -96,6 +96,7 @@ int main(int argc, char**argv){
           plots["qg" + histName]->Fill(qg->at(j));
         }
       }
+      if(norm) for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral());
 
       // Stacking, cosmetics and saving
       for(auto& plot : plots){
@@ -116,14 +117,14 @@ int main(int argc, char**argv){
         for(TString type : {"bquark","cquark","quark","gluon"}){
           TString histName = plot.first; histName.ReplaceAll("gluon", type);
           int color = (type == "gluon"? 46 : (type == "quark"? 38 : (type == "bquark"? 32 : 42)));
-          plots[histName]->SetFillColor(color);
+          if(!overlay || type == "gluon" || type == "quark") plots[histName]->SetFillColor(color);
           plots[histName]->SetLineColor(color);
-          plots[histName]->SetLineWidth(0);
-          if(stackOption == "noStack") plots[histName]->SetFillStyle(type == "quark"? 3004 : (type == "gluon"? 3005 : 3002));
+          plots[histName]->SetLineWidth(type == "quark" || type == "gluon" ? 3 : 1);
+          if(overlay) plots[histName]->SetFillStyle(type == "quark"? 3004 : 3005);
           if(plots[histName]->GetEntries()>0) l.AddEntry(plots[histName], (type == "gluon"? "gluon" : (type == "quark"? "uds" : (type == "bquark"? "b" : "c"))), "f");
           stack.Add(plots[histName]);
         }
-        stack.Draw(stackOption);
+        stack.Draw(overlay ? "nostack" : "");
         stack.GetXaxis()->CenterTitle();
         stack.GetYaxis()->CenterTitle();
         c.Modified();

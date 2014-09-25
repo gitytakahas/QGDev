@@ -14,7 +14,7 @@
 #include "TLatex.h"
 #include "TVector.h"
 #include "binFunctions.h"
-
+#include "localQGLikelihoodCalculator.h"
 
 int main(int argc, char**argv){
   bool overlay = true;
@@ -37,8 +37,12 @@ int main(int argc, char**argv){
       system("rm -rf plots/distributions/" + file + "/" + jetType);
       for(TString var: {"axis2","ptD","mult","qg"}) system("mkdir -p plots/distributions/" + file + "/" + jetType + "/" + var);
 
+      // Init local QGLikelihoodCalculator
+      QGLikelihoodCalculator localQG;
+      localQG.init("../data/pdfQG_" + jetType + "_13TeV.root");
+
       // Init qgMiniTuple
-      TFile *qgMiniTupleFile = new TFile("~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
+      TFile *qgMiniTupleFile = new TFile(file == "test" ? "../test/qgMiniTuple.root" : "~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
       TTree *qgMiniTuple; qgMiniTupleFile->GetObject("qgMiniTuple"+jetType+"/qgMiniTuple",qgMiniTuple);
       float rho = 0;
       std::vector<float> *qg 		= nullptr;
@@ -48,6 +52,7 @@ int main(int argc, char**argv){
       std::vector<float> *ptD 		= nullptr;
       std::vector<int> *mult 		= nullptr;
       std::vector<int> *partonId 	= nullptr;
+      std::vector<bool> *jetIdLoose 	= nullptr;
       qgMiniTuple->SetBranchAddress("rho", 	&rho);
       qgMiniTuple->SetBranchAddress("qg", 	&qg);
       qgMiniTuple->SetBranchAddress("pt", 	&pt);
@@ -56,6 +61,7 @@ int main(int argc, char**argv){
       qgMiniTuple->SetBranchAddress("ptD", 	&ptD);
       qgMiniTuple->SetBranchAddress("mult", 	&mult);
       qgMiniTuple->SetBranchAddress("partonId", &partonId);
+      qgMiniTuple->SetBranchAddress("jetIdLoose", &jetIdLoose);
 
       // Creation of histos
       std::map<TString, TH1F*> plots;
@@ -77,6 +83,7 @@ int main(int argc, char**argv){
       for(int i = 0; i < qgMiniTuple->GetEntries(); ++i){
         qgMiniTuple->GetEntry(i);
         for(int j = 0; j < pt->size(); ++j){
+          if(!jetIdLoose->at(j)) continue;
           TString type;
           if(partonId->at(j) == 21) 	 	type = "gluon";
           else if(fabs(partonId->at(j)) < 4) 	type = "quark";
@@ -89,14 +96,17 @@ int main(int argc, char**argv){
           if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt->at(j), ptBin)) 	continue;
           if(!getBinNumber(rhoBins, rho, rhoBin)) 				continue;
 
+          float qgcmssw = qg->at(j);
+          float qgfly = localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j), ptD->at(j), -std::log(axis2->at(j))});
+
           TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
           plots["axis2" + histName]->Fill(-std::log(axis2->at(j)));
-          plots["ptD" + histName]->Fill(ptD->at(j));
-          plots["mult" + histName]->Fill(mult->at(j));
-          plots["qg" + histName]->Fill(qg->at(j));
+          plots["ptD"   + histName]->Fill(ptD->at(j));
+          plots["mult"  + histName]->Fill(mult->at(j));
+          plots["qg"    + histName]->Fill(qgcmssw);
         }
       }
-      if(norm) for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral());
+      if(norm) for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, pdf.second->GetNbinsX() + 1));
 
       // Stacking, cosmetics and saving
       for(auto& plot : plots){

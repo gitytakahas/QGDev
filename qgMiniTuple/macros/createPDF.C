@@ -21,7 +21,7 @@ int main(int argc, char**argv){
   printBins("rho", rhoBins); std::cout << std::endl;
 
   // For different jet types
-  for(TString jetType : {"AK4","AK4chs","AK5","AK5chs"}){
+  for(TString jetType : {"AK4","AK4chs","AK5","AK5chs","AK7","AK7chs"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
     // Init qgMiniTuple
@@ -90,7 +90,7 @@ int main(int argc, char**argv){
       if(pdf.second->GetEntries() == 0) 	std::cout << "Warning: no entries in " << pdf.first << std::endl;	// Give warning for empty pdfs
       else if(pdf.second->GetEntries() < 50)   	pdf.second->Rebin(5);							// Make the pdf more stable
       else if(pdf.second->GetEntries() < 500)  	pdf.second->Rebin(2);
-      pdf.second->Scale(1./pdf.second->Integral("width"));								// Scale to integral
+      pdf.second->Scale(1./pdf.second->Integral(0, pdf.second->GetNbinsX() + 1, "width"));				// Scale to integral (also include underflow/overflow)
       pdf.second->Write();
     }
 

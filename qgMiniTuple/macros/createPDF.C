@@ -28,12 +28,13 @@ int main(int argc, char**argv){
     TFile *qgMiniTupleFile = new TFile("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8.root");
     TTree *qgMiniTuple; qgMiniTupleFile->GetObject("qgMiniTuple"+jetType+"/qgMiniTuple",qgMiniTuple);
     float rho = 0;
-    std::vector<float> *pt 	= nullptr;
-    std::vector<float> *eta 	= nullptr;
-    std::vector<float> *axis2 	= nullptr;
-    std::vector<float> *ptD 	= nullptr;
-    std::vector<int> *mult 	= nullptr;
-    std::vector<int> *partonId 	= nullptr;
+    std::vector<float> *pt 		= nullptr;
+    std::vector<float> *eta 		= nullptr;
+    std::vector<float> *axis2 		= nullptr;
+    std::vector<float> *ptD 		= nullptr;
+    std::vector<int> *mult 		= nullptr;
+    std::vector<int> *partonId 		= nullptr;
+    std::vector<bool> *jetIdLoose 	= nullptr;
     qgMiniTuple->SetBranchAddress("rho", 	&rho);
     qgMiniTuple->SetBranchAddress("pt", 	&pt);
     qgMiniTuple->SetBranchAddress("eta", 	&eta);
@@ -41,6 +42,7 @@ int main(int argc, char**argv){
     qgMiniTuple->SetBranchAddress("ptD", 	&ptD);
     qgMiniTuple->SetBranchAddress("mult", 	&mult);
     qgMiniTuple->SetBranchAddress("partonId", 	&partonId);
+    qgMiniTuple->SetBranchAddress("jetIdLoose", &jetIdLoose);
 
     // Creation of the pdfs
     std::map<TString, TH1F*> pdfs;
@@ -61,6 +63,7 @@ int main(int argc, char**argv){
     for(int i = 0; i < qgMiniTuple->GetEntries(); ++i){
       qgMiniTuple->GetEntry(i);
       for(int j = 0; j < pt->size(); ++j){
+        if(!jetIdLoose->at(j)) continue;
         if(fabs(partonId->at(j)) > 3 && partonId->at(j) != 21) continue;						// Keep only udsg
         TString type = (partonId->at(j) == 21? "gluon" : "quark");							// Define q/g
 

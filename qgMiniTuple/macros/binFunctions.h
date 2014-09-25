@@ -1,3 +1,5 @@
+#ifndef binFunctions_h
+#define binFunctions_h
 #include <vector>
 #include <iostream>
 #include "TVector.h"
@@ -25,7 +27,7 @@ bool getBinNumber(std::vector<float>& bins, float value, int& bin){
 
 
 int getBinFromString(TString s, TString var){
-  TString sub = s(s.Index(var) + var.Length() + 1, s.Length());
+  TString sub = s(s.Index(var + '-') + var.Length() + 1, s.Length());
   TString bin = sub.Contains('_')? sub(0, sub.Index('_')) : sub;
   return bin.Atoi();
 }
@@ -38,3 +40,13 @@ void writeBinsToFile(std::vector<float>& bins, TString name){
   TVectorT<float> tbins(bins.size(), &bins[0]);
   tbins.Write(name);
 }
+
+
+bool getBinsFromFile(std::vector<float>& bins, TString name, TFile* f){
+  TVectorT<float> *tbins = nullptr;
+  f->GetObject(name, tbins);
+  if(!tbins) return false;
+  for(int i = 0; i < tbins->GetNoElements(); ++i) bins.push_back((*tbins)[i]);
+  return true;
+}
+#endif

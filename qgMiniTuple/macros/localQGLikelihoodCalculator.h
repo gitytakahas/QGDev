@@ -30,7 +30,7 @@ class QGLikelihoodCalculator{
 
 
 
-float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho, std::vector<float> var){
+float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars){
   if(!isValidRange(pt, rho, eta)) return -1;
 
   float Q=1., G=1.;

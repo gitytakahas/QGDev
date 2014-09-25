@@ -54,7 +54,8 @@ class qgMiniTuple : public edm::EDAnalyzer{
       std::vector<float> *qg, *pt, *eta, *axis2, *ptD, *deltaR;
       std::vector<int> *mult, *partonId;
       std::vector<bool> *jetIdLoose, *jetIdMedium, *jetIdTight;
-      float rho; 
+      float rho;
+      int nRun, nLumi, nEvent;
 };
 
 
@@ -78,6 +79,10 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
   for(auto v : {qg, pt, eta, axis2, ptD, deltaR}) 		v->clear();
   for(auto v : {mult, partonId}) 				v->clear();
   for(auto v : {jetIdLoose, jetIdMedium, jetIdTight})		v->clear();
+
+  nRun 		= (int) iEvent.id().run();
+  nLumi 	= (int) iEvent.id().luminosityBlock();
+  nEvent	= (int) iEvent.id().event();
 
   edm::Handle<double> rho_;
   iEvent.getByToken(rhoToken, rho_);
@@ -138,6 +143,9 @@ void qgMiniTuple::beginJob(){
   for(auto v : {&jetIdLoose, &jetIdMedium, &jetIdTight}) 	*v = new std::vector<bool>();
 
   tree = fs->make<TTree>("qgMiniTuple","qgMiniTuple");
+  tree->Branch("nRun" ,		&nRun, 			"nRun/F");
+  tree->Branch("nLumi" ,	&nLumi, 		"nLumi/F");
+  tree->Branch("nEvent" ,	&nEvent, 		"nEvent/F");
   tree->Branch("rho" ,		&rho, 			"rho/F");
   tree->Branch("pt" ,		"vector<float>", 	&pt);
   tree->Branch("eta",		"vector<float>", 	&eta);

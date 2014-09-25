@@ -14,6 +14,7 @@
 #include "TLatex.h"
 #include "TVector.h"
 #include "binFunctions.h"
+#include "localQGLikelihoodCalculator.h"
 
 
 int main(int argc, char**argv){
@@ -32,11 +33,15 @@ int main(int argc, char**argv){
   for(TString file : {"VBF_HToBB_M-125_13TeV-powheg-pythia6","EWKZjj_mqq120_mll50_13TeV_madgraph-pythia8","QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8"}){
     for(TString jetType : {"AK4","AK4chs","AK5","AK5chs"}){
       std::cout << "Making plots for " << jetType << " in file " << file << "..." << std::endl;
-      system("rm -r plots/ROC/" + file + "/" + jetType);
+      system("rm -rf plots/ROC/" + file + "/" + jetType);
       for(TString var: {"axis2","ptD","mult","qg"}) system("mkdir -p plots/ROC/" + file + "/" + jetType);
 
+      // Init local QGLikelihoodCalculator
+      QGLikelihoodCalculator localQG;
+      localQG.init("../data/pdfQG_" + jetType + "_13TeV.root");
+
       // Init qgMiniTuple
-      TFile *qgMiniTupleFile = new TFile("~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
+      TFile *qgMiniTupleFile = new TFile(file == "test" ? "../test/qgMiniTuple.root" : "~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
       TTree *qgMiniTuple; qgMiniTupleFile->GetObject("qgMiniTuple"+jetType+"/qgMiniTuple",qgMiniTuple);
       float rho = 0;
       std::vector<float> *qg 		= nullptr;
@@ -62,10 +67,10 @@ int main(int argc, char**argv){
           for(int rhoBin = 0; rhoBin < getNBins(rhoBins); ++rhoBin){
             for(TString type : {"quark","gluon","bquark","cquark"}){
               TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-              plots["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, 100, 0, 8);
-              plots["ptD"   + histName]	= new TH1D("ptD"   + histName, "ptD"   + histName, 100, 0, 1);
-              plots["mult"  + histName]	= new TH1D("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
-              plots["qg"    + histName]	= new TH1D("qg"    + histName, "qg"    + histName, 100, 0, 1);
+              plots["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, 1000, 0, 8);
+              plots["ptD"   + histName]	= new TH1D("ptD"   + histName, "ptD"   + histName, 1000, 0, 1);
+              plots["mult"  + histName]	= new TH1D("mult"  + histName, "mult"  + histName, 1000, 0.5, 100.5);
+              plots["qg"    + histName]	= new TH1D("qg"    + histName, "qg"    + histName, 1000, 0, 1);
             }
           }
         }
@@ -87,14 +92,17 @@ int main(int argc, char**argv){
           if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt->at(j), ptBin)) 	continue;
           if(!getBinNumber(rhoBins, rho, rhoBin)) 				continue;
 
+          float qgcmssw = qg->at(j);
+          float qgfly = localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j), ptD->at(j), -std::log(axis2->at(j))});
+
           TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
           plots["axis2" + histName]->Fill(-std::log(axis2->at(j)));
-          plots["ptD" + histName]->Fill(ptD->at(j));
-          plots["mult" + histName]->Fill(mult->at(j));
-          plots["qg" + histName]->Fill(qg->at(j));
+          plots["ptD"   + histName]->Fill(ptD->at(j));
+          plots["mult"  + histName]->Fill(mult->at(j));
+          plots["qg"    + histName]->Fill(qgcmssw);
         }
       }
-      for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral());
+      for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX()));
 
       // Stacking, cosmetics and saving
       for(auto& plot : plots){
@@ -109,7 +117,7 @@ int main(int argc, char**argv){
         for(TString var : {"qg","axis2","ptD","mult"}){
           TString histName = plot.first;
           roc[var] = new TGraph(plot.second->GetNbinsX() + 2);
-          for(int bin = 0; bin <= plot.second->GetNbinsX() +1; ++bin){
+          for(int bin = 0; bin <= plot.second->GetNbinsX() + 1; ++bin){
             TString histName = plot.first;
             histName.ReplaceAll("qg",var);
             double gluonRej = plots[histName]->Integral(0, bin);
@@ -152,7 +160,7 @@ int main(int argc, char**argv){
         TString variable = "";
         for(TString var: {"axis2","ptD","mult","qg"}) if(plot.first.Contains(var)) variable = var;
         TString pdfName = "./plots/ROC/" + file + "/" + jetType + "/" + plot.first + ".pdf";
-        pdfName.ReplaceAll("_quark","");
+        pdfName.ReplaceAll("_gluon","");
         c.SaveAs(pdfName);
         for(auto& r : roc) delete r.second;
       }

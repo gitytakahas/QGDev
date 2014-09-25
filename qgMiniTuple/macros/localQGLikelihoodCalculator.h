@@ -35,7 +35,6 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
 
   float Q=1., G=1.;
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
-    if(vars[varIndex] > 999 && vars[varIndex] < 1001) continue;
 
     auto qgEntry = findEntry(eta, pt, rho, 0, varIndex);
     if(!qgEntry) return -1; 

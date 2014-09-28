@@ -19,6 +19,7 @@
 
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/JetReco/interface/PFJet.h"
+#include "DataFormats/BTauReco/interface/JetTag.h"
 #include "DataFormats/Common/interface/ValueMap.h"
 #include "DataFormats/Math/interface/deltaR.h"
 
@@ -44,14 +45,14 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken;
       edm::EDGetTokenT<edm::ValueMap<float>> qgToken, axis2Token, ptDToken;
       edm::EDGetTokenT<edm::ValueMap<int>> multToken;
-      const double minJetPt;
-      const double deltaRcut;
-      const bool pythia6;
+      edm::EDGetTokenT<reco::JetTagCollection> bTagToken;
+      const double minJetPt, deltaRcut;
+      const bool pythia6, bTagUsed;
 
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      std::vector<float> *qg, *pt, *eta, *axis2, *ptD, *deltaR;
+      std::vector<float> *qg, *pt, *eta, *axis2, *ptD, *deltaR, *bTag;
       std::vector<int> *mult, *partonId;
       std::vector<bool> *jetIdLoose, *jetIdMedium, *jetIdTight;
       float rho;
@@ -66,17 +67,19 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
   genParticlesToken(    consumes<reco::GenParticleCollection>(	iConfig.getParameter<edm::InputTag>("genParticlesInputTag"))),
   minJetPt(							iConfig.getUntrackedParameter<double>("minJetPt", 10.)),
   deltaRcut(							iConfig.getUntrackedParameter<double>("deltaRcut", 0.3)),
-  pythia6(							iConfig.getUntrackedParameter<bool>("pythia6", false))
+  pythia6(							iConfig.getUntrackedParameter<bool>("pythia6", false)),
+  bTagUsed(							iConfig.getUntrackedParameter<bool>("bTagUsed", false))
 {
   qgToken	= 	consumes<edm::ValueMap<float>>(		edm::InputTag(qgVariablesInputTag.label(), "qgLikelihood"));
   axis2Token	= 	consumes<edm::ValueMap<float>>(		edm::InputTag(qgVariablesInputTag.label(), "axis2Likelihood"));
   multToken	= 	consumes<edm::ValueMap<int>>(		edm::InputTag(qgVariablesInputTag.label(), "multLikelihood"));
   ptDToken	= 	consumes<edm::ValueMap<float>>(		edm::InputTag(qgVariablesInputTag.label(), "ptDLikelihood"));
+  bTagToken	=	consumes<reco::JetTagCollection>(	edm::InputTag("combinedSecondaryVertexV2BJetTags"));
 }
 
 
 void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
-  for(auto v : {qg, pt, eta, axis2, ptD, deltaR}) 		v->clear();
+  for(auto v : {qg, pt, eta, axis2, ptD, deltaR, bTag}) 		v->clear();
   for(auto v : {mult, partonId}) 				v->clear();
   for(auto v : {jetIdLoose, jetIdMedium, jetIdTight})		v->clear();
 
@@ -93,6 +96,9 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
   edm::Handle<reco::GenParticleCollection> genParticles;
   iEvent.getByToken(genParticlesToken, genParticles);
+
+  edm::Handle<reco::JetTagCollection> bTagHandle;
+  iEvent.getByToken(bTagToken, bTagHandle);
 
   edm::Handle<edm::ValueMap<float>> qgHandle, axis2Handle, ptDHandle;
   edm::Handle<edm::ValueMap<int>> multHandle;
@@ -128,6 +134,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     axis2->push_back((*axis2Handle)[jetRef]);
     mult->push_back((*multHandle)[jetRef]);
     ptD->push_back((*ptDHandle)[jetRef]);
+    bTag->push_back(bTagUsed ? (*bTagHandle)[jetRef] : -1);
 
     jetIdLoose->push_back(jetId(&*jet)); 
     jetIdMedium->push_back(jetId(&*jet, false, true)); 
@@ -138,7 +145,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 }
 
 void qgMiniTuple::beginJob(){
-  for(auto v : {&qg, &pt, &eta, &axis2, &ptD, &deltaR}) 	*v = new std::vector<float>();
+  for(auto v : {&qg, &pt, &eta, &axis2, &ptD, &deltaR, &bTag}) 	*v = new std::vector<float>();
   for(auto v : {&mult, &partonId}) 				*v = new std::vector<int>();
   for(auto v : {&jetIdLoose, &jetIdMedium, &jetIdTight}) 	*v = new std::vector<bool>();
 
@@ -153,6 +160,7 @@ void qgMiniTuple::beginJob(){
   tree->Branch("axis2",		"vector<float>", 	&axis2);
   tree->Branch("ptD",		"vector<float>",	&ptD);
   tree->Branch("mult",		"vector<int>", 		&mult);
+  tree->Branch("bTag",		"vector<float>", 	&bTag);
   tree->Branch("partonId",	"vector<int>", 		&partonId);
   tree->Branch("deltaR",	"vector<float>", 	&deltaR);
   tree->Branch("jetIdLoose",	"vector<bool>", 	&jetIdLoose);
@@ -162,7 +170,7 @@ void qgMiniTuple::beginJob(){
 
 
 void qgMiniTuple::endJob(){
-  for(auto v : {qg, pt, eta, axis2, ptD, deltaR}) 	delete v;
+  for(auto v : {qg, pt, eta, axis2, ptD, deltaR, bTag}) delete v;
   for(auto v : {mult, partonId}) 			delete v;
   for(auto v : {jetIdLoose, jetIdMedium, jetIdTight})	delete v;
 }
@@ -198,6 +206,7 @@ void qgMiniTuple::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
   desc.addUntracked<double>("minJetPt", 10.);
   desc.addUntracked<double>("deltaRcut", 0.3);
   desc.addUntracked<bool>("pythia6", false);
+  desc.addUntracked<bool>("bTagUsed", false);
   desc.setUnknown();
   descriptions.addDefault(desc);
 }

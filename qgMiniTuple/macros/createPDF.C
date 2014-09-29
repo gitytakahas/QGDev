@@ -6,6 +6,8 @@
 #include "TH1F.h"
 #include "TTree.h"
 #include "binFunctions.h"
+#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.h"
+#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.cc"
 
 
 int main(int argc, char**argv){
@@ -24,6 +26,9 @@ int main(int argc, char**argv){
   for(TString jetType : {"AK4","AK4chs","AK5","AK5chs","AK7","AK7chs"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
+    // Init local QGLikelihoodCalculator
+    QGLikelihoodCalculator localQG(("../data/pdfQG_" + jetType + "_13TeV.root").Data());
+
     // Init qgMiniTuple
     TFile *qgMiniTupleFile = new TFile("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8.root");
     TTree *qgMiniTuple; qgMiniTupleFile->GetObject("qgMiniTuple"+jetType+"/qgMiniTuple",qgMiniTuple);
@@ -32,6 +37,7 @@ int main(int argc, char**argv){
     std::vector<float> *eta 		= nullptr;
     std::vector<float> *axis2 		= nullptr;
     std::vector<float> *ptD 		= nullptr;
+    std::vector<float> *qg 		= nullptr;
     std::vector<int> *mult 		= nullptr;
     std::vector<int> *partonId 		= nullptr;
     std::vector<bool> *jetIdLoose 	= nullptr;
@@ -41,6 +47,7 @@ int main(int argc, char**argv){
     qgMiniTuple->SetBranchAddress("axis2", 	&axis2);
     qgMiniTuple->SetBranchAddress("ptD", 	&ptD);
     qgMiniTuple->SetBranchAddress("mult", 	&mult);
+    qgMiniTuple->SetBranchAddress("qg", 	&qg);
     qgMiniTuple->SetBranchAddress("partonId", 	&partonId);
     qgMiniTuple->SetBranchAddress("jetIdLoose", &jetIdLoose);
 
@@ -54,6 +61,7 @@ int main(int argc, char**argv){
             pdfs["axis2" + histName] = new TH1F("axis2" + histName, "axis2" + histName, 100, 0, 8);
             pdfs["ptD"   + histName] = new TH1F("ptD"   + histName, "ptD"   + histName, 100, 0, 1);
             pdfs["mult"  + histName] = new TH1F("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
+            pdfs["qg"    + histName] = new TH1F("qg"    + histName, "qg"    + histName, 100, -0.0001, 1.0001);
           }
         }
       }
@@ -73,9 +81,11 @@ int main(int argc, char**argv){
         if(!getBinNumber(rhoBins, rho, rhoBin)) 				continue;
         if(fabs(eta->at(j)) > 2 && fabs(eta->at(j)) < 3) 			continue;				// Don't use 2 < |eta| < 3
         TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
+        float qgfly = localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j), ptD->at(j), -std::log(axis2->at(j))});
         pdfs["axis2" + histName]->Fill(-std::log(axis2->at(j)));							// QGTagger uses -log(axis2) as pdf
         pdfs["ptD"   + histName]->Fill(ptD->at(j));
         pdfs["mult"  + histName]->Fill(mult->at(j));
+        pdfs["qg"    + histName]->Fill(qg->at(j));
       }
     }
 
@@ -87,9 +97,9 @@ int main(int argc, char**argv){
     writeBinsToFile(ptBinsF, "ptBinsF");
     writeBinsToFile(rhoBins, "rhoBins");
 
-    for(TString var : {"axis2","ptD","mult"}) pdfFile->mkdir(var);
+    for(TString var : {"axis2","ptD","mult","qg"}) pdfFile->mkdir(var);
     for(auto& pdf : pdfs){
-      for(TString var: {"axis2","ptD","mult"}) if(pdf.first.Contains(var)) pdfFile->cd(var);
+      for(TString var: {"axis2","ptD","mult","qg"}) if(pdf.first.Contains(var)) pdfFile->cd(var);
       if(pdf.second->GetEntries() == 0) 	std::cout << "Warning: no entries in " << pdf.first << std::endl;	// Give warning for empty pdfs
       else if(pdf.second->GetEntries() < 50)   	pdf.second->Rebin(5);							// Make the pdf more stable
       else if(pdf.second->GetEntries() < 500)  	pdf.second->Rebin(2);

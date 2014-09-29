@@ -1,35 +1,53 @@
-#ifndef Local_QGLikelihoodCalculator_h
-#define Local_QGLikelihoodCalculator_h
-#include <math.h>
-#include <TFile.h>
-#include <TKey.h>
-#include <TVector.h>
 #include <vector>
 #include <map>
-#include "binFunctions.h"
+#include <stdexcept>
 
-/**
- * * A modified version of /RecoJets/JetAlgorithms/src/QGLikelihoodCalculator.cc, working with ROOT files instead of database obect
- * */
+#include <TFile.h>
+#include <TKey.h>
+#include <TList.h>
+#include <TIterator.h>
+#include <TDirectory.h>
+#include <TH1F.h>
+#include <TVector.h>
+#include <TString.h>
 
-class QGLikelihoodCalculator{
-  public:
-    QGLikelihoodCalculator(){};
-    ~QGLikelihoodCalculator();
-    bool init(TString fileName);
-    float computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars);
-
-  private:
-    TH1F* findEntry(float eta, float pt, float rho, int qgIndex, int varIndex);
-    bool isValidRange(float pt, float rho, float eta);
-
-    std::vector<float> etaBins, ptBinsC, ptBinsF, rhoBins;
-    std::map<TString, TH1F*> pdfs; 
-    TFile* f;
-};
+#include "localQGLikelihoodCalculator.h"
 
 
+/// Constructor
+QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename){
+  if(filename == "" || !this->init(filename)) throw std::runtime_error("Initialization failed: please check filename");
+}
 
+
+/// Initialisation of the QGLikelihoodCalculator
+bool QGLikelihoodCalculator::init(const TString& fileName){
+  f = new TFile(fileName);
+  if(f->IsZombie()) 				return false;
+  if(!getBinsFromFile(etaBins, "etaBins", f))	return false;
+  if(!getBinsFromFile(ptBinsC, "ptBinsC", f))	return false;
+  if(!getBinsFromFile(ptBinsF, "ptBinsF", f))	return false;
+  if(!getBinsFromFile(rhoBins, "rhoBins", f))	return false;
+
+  TList *keys = f->GetListOfKeys();
+  if(!keys) return false;
+
+  TIter nextdir(keys);
+  TKey *keydir;
+  while((keydir = (TKey*) nextdir())){
+    if(!keydir->IsFolder()) continue;
+    TDirectory *dir = (TDirectory*) keydir->ReadObj() ;
+    TIter nexthist(dir->GetListOfKeys());
+    TKey *keyhist;
+    while((keyhist = (TKey*) nexthist())){
+      pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj(); 
+    }
+  }
+  return true;
+}
+
+
+/// Compute the QGLikelihood, given the pT, eta, rho and likelihood variables vector
 float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars){
   if(!isValidRange(pt, rho, eta)) return -1;
 
@@ -37,7 +55,7 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
 
     auto qgEntry = findEntry(eta, pt, rho, 0, varIndex);
-    if(!qgEntry) return -1; 
+    if(!qgEntry) return -1;
     float Qi = qgEntry->GetBinContent(qgEntry->FindBin(vars[varIndex]));
     float mQ = qgEntry->GetMean();
 
@@ -90,37 +108,28 @@ bool QGLikelihoodCalculator::isValidRange(float pt, float rho, float eta){
 }
 
 
-bool QGLikelihoodCalculator::init(TString fileName){
-  f = new TFile("../data/" + fileName);
-  if(f->IsZombie()) 				return false;
-  if(!getBinsFromFile(etaBins, "etaBins", f))	return false;
-  if(!getBinsFromFile(ptBinsC, "ptBinsC", f))	return false;
-  if(!getBinsFromFile(ptBinsF, "ptBinsF", f))	return false;
-  if(!getBinsFromFile(rhoBins, "rhoBins", f))	return false;
-  std::cout << "localQGLikelihoodCalculator: Initialized binning of pdfs..." << std::endl;
-
-  TList *keys = f->GetListOfKeys();
-  if(!keys) return false;
-
-  TIter nextdir(keys);
-  TKey *keydir;
-  while((keydir = (TKey*)nextdir())){
-    if(!keydir->IsFolder()) continue;
-    TDirectory *dir = (TDirectory*)keydir->ReadObj() ;
-    TIter nexthist(dir->GetListOfKeys());
-    TKey *keyhist;
-    while((keyhist = (TKey*)nexthist())){
-      pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj(); 
-    }
-  }
-  std::cout << "localQGLikelihoodCalculater: pdfs initialized..." << std::endl;
-
+/// Translates the TVector with the bins to std::vector
+bool QGLikelihoodCalculator::getBinsFromFile(std::vector<float>& bins, const TString& name, TFile* f){
+  TVectorT<float> *tbins = nullptr;
+  f->GetObject(name, tbins);
+  if(!tbins) return false;
+  for(int i = 0; i < tbins->GetNoElements(); ++i) bins.push_back((*tbins)[i]);
   return true;
 }
 
 
+/// Find the bin number for a value, given the bin vector
+bool QGLikelihoodCalculator::getBinNumber(std::vector<float>& bins, float value, int& bin){
+  if(value < bins.front() || value > bins.back()) return false;
+  auto binUp = bins.begin() + 1;
+  while(value > *binUp) ++binUp;
+  bin = binUp - bins.begin() - 1;
+  return true;
+}
+
+
+/// Destroy the QGLikelihoodCalculator
 QGLikelihoodCalculator::~QGLikelihoodCalculator(){
   for(auto& pdf : pdfs) delete pdf.second;
   delete f;
 }
-#endif

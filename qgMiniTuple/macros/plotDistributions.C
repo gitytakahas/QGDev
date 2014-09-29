@@ -14,7 +14,8 @@
 #include "TLatex.h"
 #include "TVector.h"
 #include "binFunctions.h"
-#include "localQGLikelihoodCalculator.h"
+#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.h"
+#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.cc"
 
 int main(int argc, char**argv){
   bool overlay = true;
@@ -25,6 +26,7 @@ int main(int argc, char**argv){
   std::vector<float> ptBinsC; getBins(ptBinsC, 10, 20, 2000, true); ptBinsC.push_back(4000);
   std::vector<float> ptBinsF; getBins(ptBinsF, 10, 20, 2000, true); ptBinsF.erase(ptBinsF.end() - 5, ptBinsF.end()); ptBinsF.push_back(4000);
   std::vector<float> rhoBins; getBins(rhoBins, 1, 4, 46, false);
+
   printBins("eta", etaBins);
   printBins("pt (central)", ptBinsC);
   printBins("pt (forward)", ptBinsF);
@@ -38,8 +40,7 @@ int main(int argc, char**argv){
       for(TString var: {"axis2","ptD","mult","qg"}) system("mkdir -p plots/distributions/" + file + "/" + jetType + "/" + var);
 
       // Init local QGLikelihoodCalculator
-      QGLikelihoodCalculator localQG;
-      localQG.init("../data/pdfQG_" + jetType + "_13TeV.root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV.root");
 
       // Init qgMiniTuple
       TFile *qgMiniTupleFile = new TFile(file == "test" ? "../test/qgMiniTuple.root" : "~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
@@ -70,10 +71,10 @@ int main(int argc, char**argv){
           for(int rhoBin = 0; rhoBin < getNBins(rhoBins); ++rhoBin){
             for(TString type : {"quark","gluon","bquark","cquark"}){
               TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-              plots["axis2" + histName] = new TH1F("axis2" + histName, "axis2" + histName, 50, 0, 8);
-              plots["ptD"   + histName]	= new TH1F("ptD"   + histName, "ptD"   + histName, 50, 0, 1);
-              plots["mult"  + histName]	= new TH1F("mult"  + histName, "mult"  + histName, 50, 0.5, 100.5);
-              plots["qg"    + histName]	= new TH1F("qg"    + histName, "qg"    + histName, 50, 0, 1);
+              plots["axis2" + histName] = new TH1F("axis2" + histName, "axis2" + histName, 100, 0, 8);
+              plots["ptD"   + histName]	= new TH1F("ptD"   + histName, "ptD"   + histName, 100, 0, 1);
+              plots["mult"  + histName]	= new TH1F("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
+              plots["qg"    + histName]	= new TH1F("qg"    + histName, "qg"    + histName, 100, -0.00001, 1.0001);
             }
           }
         }
@@ -98,15 +99,16 @@ int main(int argc, char**argv){
 
           float qgcmssw = qg->at(j);
           float qgfly = localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j), ptD->at(j), -std::log(axis2->at(j))});
+          if(qgfly < 0 || qgfly > 1) continue;
 
           TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
           plots["axis2" + histName]->Fill(-std::log(axis2->at(j)));
           plots["ptD"   + histName]->Fill(ptD->at(j));
           plots["mult"  + histName]->Fill(mult->at(j));
-          plots["qg"    + histName]->Fill(qgcmssw);
+          plots["qg"    + histName]->Fill(qgfly);
         }
       }
-      if(norm) for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, pdf.second->GetNbinsX() + 1));
+      if(norm) for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX() + 1));
 
       // Stacking, cosmetics and saving
       for(auto& plot : plots){
@@ -124,14 +126,14 @@ int main(int argc, char**argv){
         if(plot.first.Contains("qg"))    axisTitle = "quark-gluon likelihood";
 
         THStack stack(plot.first,";"+axisTitle+";jets/bin");
-        for(TString type : {"bquark","cquark","quark","gluon"}){
+        for(TString type : {"gluon","quark","bquark","cquark"}){
           TString histName = plot.first; histName.ReplaceAll("gluon", type);
           int color = (type == "gluon"? 46 : (type == "quark"? 38 : (type == "bquark"? 32 : 42)));
           if(!overlay || type == "gluon" || type == "quark") plots[histName]->SetFillColor(color);
           plots[histName]->SetLineColor(color);
           plots[histName]->SetLineWidth(type == "quark" || type == "gluon" ? 3 : 1);
           if(overlay) plots[histName]->SetFillStyle(type == "quark"? 3004 : 3005);
-          if(plots[histName]->GetEntries()>0) l.AddEntry(plots[histName], (type == "gluon"? "gluon" : (type == "quark"? "uds" : (type == "bquark"? "b" : "c"))), "f");
+          l.AddEntry(plots[histName], (type == "gluon"? "gluon" : (type == "quark"? "uds" : (type == "bquark"? "b" : "c"))), "f");
           stack.Add(plots[histName]);
         }
         stack.Draw(overlay ? "nostack" : "");

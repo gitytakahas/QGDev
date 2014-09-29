@@ -14,7 +14,8 @@
 #include "TLatex.h"
 #include "TVector.h"
 #include "binFunctions.h"
-#include "localQGLikelihoodCalculator.h"
+#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.h"
+#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.cc"
 
 
 int main(int argc, char**argv){
@@ -37,8 +38,7 @@ int main(int argc, char**argv){
       for(TString var: {"axis2","ptD","mult","qg"}) system("mkdir -p plots/ROC/" + file + "/" + jetType);
 
       // Init local QGLikelihoodCalculator
-      QGLikelihoodCalculator localQG;
-      localQG.init("../data/pdfQG_" + jetType + "_13TeV.root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV.root");
 
       // Init qgMiniTuple
       TFile *qgMiniTupleFile = new TFile(file == "test" ? "../test/qgMiniTuple.root" : "~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
@@ -51,14 +51,16 @@ int main(int argc, char**argv){
       std::vector<float> *ptD 		= nullptr;
       std::vector<int> *mult 		= nullptr;
       std::vector<int> *partonId 	= nullptr;
-      qgMiniTuple->SetBranchAddress("rho", 	&rho);
-      qgMiniTuple->SetBranchAddress("qg", 	&qg);
-      qgMiniTuple->SetBranchAddress("pt", 	&pt);
-      qgMiniTuple->SetBranchAddress("eta", 	&eta);
-      qgMiniTuple->SetBranchAddress("axis2", 	&axis2);
-      qgMiniTuple->SetBranchAddress("ptD", 	&ptD);
-      qgMiniTuple->SetBranchAddress("mult", 	&mult);
-      qgMiniTuple->SetBranchAddress("partonId", &partonId);
+      std::vector<bool> *jetIdLoose 	= nullptr;
+      qgMiniTuple->SetBranchAddress("rho", 		&rho);
+      qgMiniTuple->SetBranchAddress("qg", 		&qg);
+      qgMiniTuple->SetBranchAddress("pt", 		&pt);
+      qgMiniTuple->SetBranchAddress("eta", 		&eta);
+      qgMiniTuple->SetBranchAddress("axis2", 		&axis2);
+      qgMiniTuple->SetBranchAddress("ptD", 		&ptD);
+      qgMiniTuple->SetBranchAddress("mult", 		&mult);
+      qgMiniTuple->SetBranchAddress("partonId", 	&partonId);
+      qgMiniTuple->SetBranchAddress("jetIdLoose", 	&jetIdLoose);
 
       // Creation of histos
       std::map<TString, TH1D*> plots;
@@ -67,10 +69,13 @@ int main(int argc, char**argv){
           for(int rhoBin = 0; rhoBin < getNBins(rhoBins); ++rhoBin){
             for(TString type : {"quark","gluon","bquark","cquark"}){
               TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-              plots["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, 1000, 0, 8);
-              plots["ptD"   + histName]	= new TH1D("ptD"   + histName, "ptD"   + histName, 1000, 0, 1);
-              plots["mult"  + histName]	= new TH1D("mult"  + histName, "mult"  + histName, 1000, 0.5, 100.5);
-              plots["qg"    + histName]	= new TH1D("qg"    + histName, "qg"    + histName, 1000, 0, 1);
+              plots["axis2"  + histName] 	= new TH1D("axis2"  + histName, "axis2"     + histName, 50, 0, 8);
+              plots["ptD"    + histName]	= new TH1D("ptD"    + histName, "ptD"       + histName, 50, 0, 1);
+              plots["mult"   + histName]	= new TH1D("mult"   + histName, "mult"      + histName, 50, 0.5, 100.5);
+              plots["qg"     + histName]	= new TH1D("qg"     + histName, "qg"        + histName, 50, -0.0001, 1.0001);
+              plots["axis2L" + histName]	= new TH1D("axis2L" + histName, "axis2 (L)" + histName, 50, -0.0001, 1.0001);
+              plots["ptDL"   + histName]	= new TH1D("ptDL"   + histName, "ptD (L)"   + histName, 50, -0.0001, 1.0001);
+              plots["multL"  + histName]	= new TH1D("multL"  + histName, "mult (L)"  + histName, 50, -0.0001, 1.0001);
             }
           }
         }
@@ -80,11 +85,10 @@ int main(int argc, char**argv){
       for(int i = 0; i < qgMiniTuple->GetEntries(); ++i){
         qgMiniTuple->GetEntry(i);
         for(int j = 0; j < pt->size(); ++j){
+          if(!jetIdLoose->at(j)) continue;
           TString type;
           if(partonId->at(j) == 21) 	 	type = "gluon";
           else if(fabs(partonId->at(j)) < 4) 	type = "quark";
-          else if(fabs(partonId->at(j)) == 4) 	type = "cquark";
-          else if(fabs(partonId->at(j)) == 5) 	type = "bquark";
           else continue;
 
           int etaBin, ptBin, rhoBin;
@@ -92,17 +96,23 @@ int main(int argc, char**argv){
           if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt->at(j), ptBin)) 	continue;
           if(!getBinNumber(rhoBins, rho, rhoBin)) 				continue;
 
-          float qgcmssw = qg->at(j);
-          float qgfly = localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j), ptD->at(j), -std::log(axis2->at(j))});
+          float qgcmssw 	= qg->at(j);
+          float qgfly 		= localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j), ptD->at(j), -std::log(axis2->at(j))});
+          float qgflyMult 	= localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j)});
+          float qgflyPtD 	= localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {ptD->at(j)});
+          float qgflyAxis2 	= localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {-std::log(axis2->at(j))});
 
           TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-          plots["axis2" + histName]->Fill(-std::log(axis2->at(j)));
-          plots["ptD"   + histName]->Fill(ptD->at(j));
-          plots["mult"  + histName]->Fill(mult->at(j));
-          plots["qg"    + histName]->Fill(qgcmssw);
+          plots["axis2"  + histName]->Fill(-std::log(axis2->at(j)));
+          plots["ptD"    + histName]->Fill(ptD->at(j));
+          plots["mult"   + histName]->Fill(mult->at(j));
+          plots["axis2L" + histName]->Fill(qgflyAxis2);
+          plots["ptDL"   + histName]->Fill(qgflyPtD);
+          plots["multL"  + histName]->Fill(qgflyMult);
+          plots["qg"     + histName]->Fill(qgfly);
         }
       }
-      for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX()));
+      for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX() + 1));
 
       // Stacking, cosmetics and saving
       for(auto& plot : plots){
@@ -114,7 +124,7 @@ int main(int argc, char**argv){
         l.SetBorderSize(0);
 
         std::map<TString, TGraph*> roc;
-        for(TString var : {"qg","axis2","ptD","mult"}){
+        for(TString var : {"qg","axis2","ptD","mult","axis2L","ptDL","multL"}){
           TString histName = plot.first;
           roc[var] = new TGraph(plot.second->GetNbinsX() + 2);
           for(int bin = 0; bin <= plot.second->GetNbinsX() + 1; ++bin){
@@ -122,8 +132,8 @@ int main(int argc, char**argv){
             histName.ReplaceAll("qg",var);
             double gluonRej = plots[histName]->Integral(0, bin);
             histName.ReplaceAll("gluon","quark");
-            double quarkEff = 1-plots[histName]->Integral(0, bin);
-            if(var == "mult"){ gluonRej = 1-gluonRej; quarkEff = 1-quarkEff;}
+            double quarkEff = 1.-plots[histName]->Integral(0, bin);
+            if(var == "mult"){ gluonRej = 1.-gluonRej; quarkEff = 1.-quarkEff;}
             roc[var]->SetPoint(bin, gluonRej, quarkEff);
           }
           if(var == "qg"){
@@ -134,11 +144,18 @@ int main(int argc, char**argv){
             roc[var]->SetLineWidth(2);
             roc[var]->SetTitle("ROC");
             roc[var]->Draw("AL");
+            l.AddEntry(roc[var], "quark-gluon likelihood", "l");
           } else {
             roc[var]->SetLineColor(var == "axis2"? kYellow : (var == "ptD"? kBlue : kRed));
+            if(var == "axis2L" || var == "ptDL" || var == "multL"){
+              roc[var]->SetLineStyle(3);
+              roc[var]->SetLineColor(var == "axis2L"? kYellow : (var == "ptDL"? kBlue : kRed));
+              l.AddEntry(roc[var], (var == "axis2L"? "-log(#sigma_{2})" : (var == "multL"? "multiplicity" : "p_{T}D")), "l");
+            } else {
+              l.AddEntry(roc[var], (var == "axis2"? "-log(#sigma_{2})" : (var == "mult"? "multiplicity" : "p_{T}D")), "l");
+            }
             roc[var]->Draw("L");
           }
-          l.AddEntry(roc[var], (var == "qg"?"quark-gluon likelihood" : (var == "axis2"? "-log(#sigma_{2})" : (var == "mult"? "multiplicity" : "p_{T}D"))), "l"); 
         }
         l.Draw();
         c.Modified();

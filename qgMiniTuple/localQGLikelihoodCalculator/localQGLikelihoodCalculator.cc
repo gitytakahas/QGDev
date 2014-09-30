@@ -56,12 +56,14 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
 
     auto qgEntry = findEntry(eta, pt, rho, 0, varIndex);
     if(!qgEntry) return -1;
-    float Qi = qgEntry->GetBinContent(qgEntry->FindBin(vars[varIndex]));
+    int binQ = qgEntry->FindBin(vars[varIndex]);
+    float Qi = qgEntry->GetBinContent(binQ)*qgEntry->GetBinWidth(binQ);
     float mQ = qgEntry->GetMean();
 
     qgEntry = findEntry(eta, pt, rho, 1, varIndex); 
     if(!qgEntry) return -1;
-    float Gi = qgEntry->GetBinContent(qgEntry->FindBin(vars[varIndex]));
+    int binG = qgEntry->FindBin(vars[varIndex]);
+    float Gi = qgEntry->GetBinContent(binG)*qgEntry->GetBinWidth(binG);
     float mG = qgEntry->GetMean();
 
     float epsilon=0;
@@ -81,6 +83,57 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
   }
 
   if(Q==0) return 0;
+  return Q/(Q+G);
+}
+
+
+/// Compute the QGLikelihood using CDF, given the pT, eta, rho and likelihood variables vector
+float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float rho, std::vector<float> vars){
+  if(!isValidRange(pt, rho, eta)) return -1;
+
+  float Q=1., G=1.;
+  for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
+
+    auto quarkEntry = findEntry(eta, pt, rho, 0, varIndex);
+    auto gluonEntry = findEntry(eta, pt, rho, 1, varIndex);
+    if(!quarkEntry || !gluonEntry) return -1;
+
+    float cdfQuark = quarkEntry->Integral(0, quarkEntry->FindBin(vars[varIndex]), "width");
+    float cdfGluon = gluonEntry->Integral(0, gluonEntry->FindBin(vars[varIndex]), "width");
+
+    float ccdfQuark = 1.-cdfQuark;
+    float ccdfGluon = 1.-cdfGluon;
+
+    float Qi, Gi;
+    if(quarkEntry->GetMean() < gluonEntry->GetMean()){
+      if(cdfQuark+cdfGluon <= 0){
+        Qi = 0.99;
+        Gi = 0.01;
+      } else if(ccdfQuark+ccdfGluon <= 0){
+        Qi = 0.01;
+        Gi = 0.99;
+      } else {
+        Qi = cdfQuark/(cdfQuark+cdfGluon) - 0.5;
+        Gi = ccdfGluon/(ccdfQuark+ccdfGluon) - 0.5;
+      }
+    } else {
+      if(cdfQuark+cdfGluon <= 0){
+        Qi = 0.01;
+        Gi = 0.99;
+      } else if(ccdfQuark+ccdfGluon <= 0){
+        Qi = 0.99;
+        Qi = 0.01;
+      } else {
+        Qi = ccdfQuark/(ccdfQuark+ccdfGluon) - 0.5;
+        Gi = cdfGluon/(cdfQuark+cdfGluon) - 0.5;
+      }
+    }
+
+    Q*=Qi;
+    G*=Gi;
+  }
+
+  if(Q+G <= 0) return 0.5;
   return Q/(Q+G);
 }
 

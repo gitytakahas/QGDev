@@ -150,9 +150,9 @@ void qgMiniTuple::beginJob(){
   for(auto v : {&jetIdLoose, &jetIdMedium, &jetIdTight}) 	*v = new std::vector<bool>();
 
   tree = fs->make<TTree>("qgMiniTuple","qgMiniTuple");
-  tree->Branch("nRun" ,		&nRun, 			"nRun/F");
-  tree->Branch("nLumi" ,	&nLumi, 		"nLumi/F");
-  tree->Branch("nEvent" ,	&nEvent, 		"nEvent/F");
+  tree->Branch("nRun" ,		&nRun, 			"nRun/I");
+  tree->Branch("nLumi" ,	&nLumi, 		"nLumi/I");
+  tree->Branch("nEvent" ,	&nEvent, 		"nEvent/I");
   tree->Branch("rho" ,		&rho, 			"rho/F");
   tree->Branch("pt" ,		"vector<float>", 	&pt);
   tree->Branch("eta",		"vector<float>", 	&eta);

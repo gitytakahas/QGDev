@@ -146,9 +146,10 @@ int main(int argc, char**argv){
               roc[var+type]->SetPoint(bin, gluonRej, quarkEff);
             }
 
-            if(type == "_c")  	 roc[var+type]->SetLineColor((var == "qg"? kGray : (var == "axis2"? kGreen : (var == "ptD"? kViolet : kOrange))));
-            else		 roc[var+type]->SetLineColor((var == "qg"? kBlack : (var == "axis2"? kYellow : (var == "ptD"? kBlue : kRed))));
-            roc[var+type]->SetLineWidth(var == "qg"? 3 : (type == "_l"? 2 : 1));
+            if(type == "_l")  	 	roc[var+type]->SetLineColor((var == "qg"? kGray+1 : (var == "axis2"? kGreen+4 : (var == "ptD"? kMagenta+4 : kRed))));
+            else if(type == "_c")  	roc[var+type]->SetLineColor((var == "qg"? kBlack : (var == "axis2"? kYellow : (var == "ptD"? kAzure+10 : kOrange))));
+            else		 	roc[var+type]->SetLineColor(var == "axis2"? kGreen+4 : (var == "ptD"? kMagenta+4 : kRed));
+            roc[var+type]->SetLineWidth(type == "_l" ? 3 : 1);
             roc[var+type]->SetLineStyle(type == ""? 3 : 1);
 
             TString entryName = "quark-gluon";

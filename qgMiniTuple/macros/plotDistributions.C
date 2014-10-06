@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <iomanip>
 #include "TMath.h"
 #include "TTree.h"
 #include "TFile.h"
@@ -23,9 +24,9 @@ int main(int argc, char**argv){
 
   // Define binning for plots
   std::vector<float> etaBins 	= {0,2.5,4.7};
-  std::vector<float> ptBinsC; getBins(ptBinsC, 10, 20, 2000, true); ptBinsC.push_back(4000);
-  std::vector<float> ptBinsF; getBins(ptBinsF, 10, 20, 2000, true); ptBinsF.erase(ptBinsF.end() - 5, ptBinsF.end()); ptBinsF.push_back(4000);
-  std::vector<float> rhoBins; getBins(rhoBins, 1, 4, 46, false);
+  std::vector<float> ptBinsC; getBins(ptBinsC, 20, 20, 2000, true); ptBinsC.push_back(4000);
+  std::vector<float> ptBinsF; getBins(ptBinsF, 20, 20, 2000, true); ptBinsF.erase(ptBinsF.end() - 12, ptBinsF.end()); ptBinsF.push_back(4000);
+  std::vector<float> rhoBins; getBins(rhoBins, 40, 0, 40, false); rhoBins.push_back(42); rhoBins.push_back(44); rhoBins.push_back(50);
 
   printBins("eta", etaBins);
   printBins("pt (central)", ptBinsC);
@@ -33,19 +34,22 @@ int main(int argc, char**argv){
   printBins("rho", rhoBins); std::cout << std::endl;
 
   // For different samples and jet types
-  for(TString file : {"VBF_HToBB_M-125_13TeV-powheg-pythia6","EWKZjj_mqq120_mll50_13TeV_madgraph-pythia8","QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8"}){
-    for(TString jetType : {"AK4","AK4chs","AK5","AK5chs"}){
+//  for(TString file : {"VBF_HToBB_M-125_13TeV-powheg-pythia6","EWKZjj_mqq120_mll50_13TeV_madgraph-pythia8","QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"}){
+  for(TString file : {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_AllPU"}){
+//    for(TString jetType : {"AK4","AK4chs","AK5","AK5chs"}){
+    for(TString jetType : {"AK4chs"}){
       std::cout << "Making plots for " << jetType << " in file " << file << "..." << std::endl;
       system("rm -rf plots/distributions/" + file + "/" + jetType);
-      for(TString var: {"axis2","ptD","mult","qg"}) system("mkdir -p plots/distributions/" + file + "/" + jetType + "/" + var);
+      for(TString var: {"axis2","ptD","mult","qg","axis2_likelihood","mult_likelihood","ptD_likelihood","cdf","axis2_cdf","mult_cdf","ptD_cdf"}) system("mkdir -p plots/distributions/" + file + "/" + jetType + "/" + var);
 
       // Init local QGLikelihoodCalculator
       QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV.root");
+      QGLikelihoodCalculator localQG_cdf("../data/pdfQG_" + jetType + "_fineBinning_13TeV.root");
 
       // Init qgMiniTuple
       TFile *qgMiniTupleFile = new TFile(file == "test" ? "../test/qgMiniTuple.root" : "~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
       TTree *qgMiniTuple; qgMiniTupleFile->GetObject("qgMiniTuple"+jetType+"/qgMiniTuple",qgMiniTuple);
-      float rho = 0;
+      float rho; int event;
       std::vector<float> *qg 		= nullptr;
       std::vector<float> *pt 		= nullptr;
       std::vector<float> *eta 		= nullptr;
@@ -54,6 +58,7 @@ int main(int argc, char**argv){
       std::vector<int> *mult 		= nullptr;
       std::vector<int> *partonId 	= nullptr;
       std::vector<bool> *jetIdLoose 	= nullptr;
+      qgMiniTuple->SetBranchAddress("nEvent", 	&event);
       qgMiniTuple->SetBranchAddress("rho", 	&rho);
       qgMiniTuple->SetBranchAddress("qg", 	&qg);
       qgMiniTuple->SetBranchAddress("pt", 	&pt);
@@ -65,24 +70,37 @@ int main(int argc, char**argv){
       qgMiniTuple->SetBranchAddress("jetIdLoose", &jetIdLoose);
 
       // Creation of histos
-      std::map<TString, TH1F*> plots;
+      std::map<TString, TH1D*> plots;
       for(int etaBin = 0; etaBin < getNBins(etaBins); ++etaBin){
         for(int ptBin = 0; ptBin < getNBins(etaBin == 0? ptBinsC : ptBinsF); ++ptBin){
           for(int rhoBin = 0; rhoBin < getNBins(rhoBins); ++rhoBin){
             for(TString type : {"quark","gluon","bquark","cquark"}){
               TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-              plots["axis2" + histName] = new TH1F("axis2" + histName, "axis2" + histName, 100, 0, 8);
-              plots["ptD"   + histName]	= new TH1F("ptD"   + histName, "ptD"   + histName, 100, 0, 1);
-              plots["mult"  + histName]	= new TH1F("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
-              plots["qg"    + histName]	= new TH1F("qg"    + histName, "qg"    + histName, 100, -0.00001, 1.0001);
+              plots["axis2"  + histName] 	= new TH1D("axis2" + histName, "axis2" + histName, 100, 1, 9);
+              plots["ptD"    + histName]	= new TH1D("ptD"   + histName, "ptD"   + histName, 100, 0, 1);
+              plots["mult"   + histName]	= new TH1D("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
+              plots["qg"     + histName]	= new TH1D("qg"    + histName, "qg"    + histName, 100, -0.00001, 1.0001);
+              plots["axis2L" + histName]	= new TH1D("axis2L" + histName, "axis2 (L)" + histName, 100, -0.0001, 1.0001);
+              plots["ptDL"   + histName]	= new TH1D("ptDL"   + histName, "ptD (L)"   + histName, 100, -0.0001, 1.0001);
+              plots["multL"  + histName]	= new TH1D("multL"  + histName, "mult (L)"  + histName, 100, -0.0001, 1.0001);
+              plots["cdf"    + histName]	= new TH1D("qgC"    + histName, "qg (C)"    + histName, 100, -0.0001, 1.0001);
+              plots["axis2C" + histName]	= new TH1D("axis2C" + histName, "axis2 (C)" + histName, 100, -0.0001, 1.0001);
+              plots["ptDC"   + histName]	= new TH1D("ptDC"   + histName, "ptD (C)"   + histName, 100, -0.0001, 1.0001);
+              plots["multC"  + histName]	= new TH1D("multC"  + histName, "mult (C)"  + histName, 100, -0.0001, 1.0001);
             }
           }
         }
       }
 
       // Fill histos
+      std::map<int, std::map<int, std::map<int, std::vector<int>*>>> eventsWithRho;
       for(int i = 0; i < qgMiniTuple->GetEntries(); ++i){
         qgMiniTuple->GetEntry(i);
+        int rhoBin;
+        if(!getBinNumber(rhoBins, rho, rhoBin)) continue;
+        if(eventAlreadyInRhoBin(eventsWithRho, rhoBin, event)) continue;
+//        std::cout << std::endl << "Event:\t" << event << "\trho:" << rho << std::endl;
+//        std::cout << std::setw(6) << "pdgId" << "\t" << std::setw(10) << "pT [GeV]" << "\t" << std::setw(10) << "eta" << "\t\t" << std::setw(10) << "mult" << "\t" << std::setw(10) << "ptD" << "\t" << std::setw(10) << "axis2" << "\t" << std::setw(10) << "qg-likelihood" << std::endl;
         for(int j = 0; j < pt->size(); ++j){
           if(!jetIdLoose->at(j)) continue;
           TString type;
@@ -92,22 +110,39 @@ int main(int argc, char**argv){
           else if(fabs(partonId->at(j)) == 5) 	type = "bquark";
           else continue;
 
-          int etaBin, ptBin, rhoBin;
+          int etaBin, ptBin;
           if(!getBinNumber(etaBins, fabs(eta->at(j)), etaBin)) 			continue;
           if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt->at(j), ptBin)) 	continue;
-          if(!getBinNumber(rhoBins, rho, rhoBin)) 				continue;
 
           float qgcmssw = qg->at(j);
           float qgfly = localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j), ptD->at(j), -std::log(axis2->at(j))});
-          if(qgfly < 0 || qgfly > 1) continue;
+          float qgflyMult 	= localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {(float) mult->at(j)});
+          float qgflyPtD 	= localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {-1, ptD->at(j)});
+          float qgflyAxis2 	= localQG.computeQGLikelihood(pt->at(j), eta->at(j), rho, {-1, -1, -std::log(axis2->at(j))});
+          float qgflyC 		= localQG_cdf.computeQGLikelihoodCDF(pt->at(j), eta->at(j), rho, {(float) mult->at(j), ptD->at(j), -std::log(axis2->at(j))});
+          float qgflyCMult 	= localQG_cdf.computeQGLikelihoodCDF(pt->at(j), eta->at(j), rho, {(float) mult->at(j)});
+          float qgflyCPtD 	= localQG_cdf.computeQGLikelihoodCDF(pt->at(j), eta->at(j), rho, {-1, ptD->at(j)});
+          float qgflyCAxis2 	= localQG_cdf.computeQGLikelihoodCDF(pt->at(j), eta->at(j), rho, {-1, -1, -std::log(axis2->at(j))});
+
+//          std::cout << std::setw(6) << partonId->at(j) << "\t" << std::setw(10) << pt->at(j) << "\t" << std::setw(10) << eta->at(j) << "\t\t" << std::setw(10) << mult->at(j) << "\t" << std::setw(10) << ptD->at(j) << "\t" << std::setw(10) << axis2->at(j) << "\t" << std::setw(10) << qgcmssw << std::endl;
+
+
 
           TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-          plots["axis2" + histName]->Fill(-std::log(axis2->at(j)));
-          plots["ptD"   + histName]->Fill(ptD->at(j));
-          plots["mult"  + histName]->Fill(mult->at(j));
-          plots["qg"    + histName]->Fill(qgfly);
+          plots["axis2"  + histName]->Fill(-std::log(axis2->at(j)));
+          plots["ptD"    + histName]->Fill(ptD->at(j));
+          plots["mult"   + histName]->Fill(mult->at(j));
+          plots["qg"     + histName]->Fill(qgfly);
+          plots["axis2L" + histName]->Fill(qgflyAxis2);
+          plots["ptDL"   + histName]->Fill(qgflyPtD);
+          plots["multL"  + histName]->Fill(qgflyMult);
+          plots["axis2C" + histName]->Fill(qgflyCAxis2);
+          plots["ptDC"   + histName]->Fill(qgflyCPtD);
+          plots["multC"  + histName]->Fill(qgflyCMult);
+          plots["cdf"    + histName]->Fill(qgflyC);
         }
       }
+      for(auto& i : eventsWithRho) for(auto& j : i.second) for(auto& k : j.second) delete k.second;
       if(norm) for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX() + 1));
 
       // Stacking, cosmetics and saving
@@ -124,8 +159,9 @@ int main(int argc, char**argv){
         if(plot.first.Contains("ptD")) 	 axisTitle = "p_{T}D";
         if(plot.first.Contains("mult"))  axisTitle = "multiplicity";
         if(plot.first.Contains("qg"))    axisTitle = "quark-gluon likelihood";
+        if(plot.first.Contains("cdf"))   axisTitle = "quark-gluon likelihood (CDF)";
 
-        THStack stack(plot.first,";"+axisTitle+";jets/bin");
+        THStack stack(plot.first,";"+axisTitle+";");
         for(TString type : {"gluon","quark","bquark","cquark"}){
           TString histName = plot.first; histName.ReplaceAll("gluon", type);
           int color = (type == "gluon"? 46 : (type == "quark"? 38 : (type == "bquark"? 32 : 42)));
@@ -157,7 +193,9 @@ int main(int argc, char**argv){
         t.DrawLatex(0.1,0.93,  jetType);
 
         TString variable = "";
-        for(TString var: {"axis2","ptD","mult","qg"}) if(plot.first.Contains(var)) variable = var;
+        for(TString var: {"axis2","ptD","mult","qg","cdf"}) if(plot.first.Contains(var)) variable = var;
+        if(plot.first.Contains("L")) variable += "_likelihood";
+        if(plot.first.Contains("C")) variable += "_cdf";
         TString pdfName = "./plots/distributions/" + file + "/" + jetType + "/" + variable + "/" + plot.first + ".pdf";
         pdfName.ReplaceAll("_gluon","");
         c.SaveAs(pdfName);

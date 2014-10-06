@@ -40,7 +40,7 @@ bool QGLikelihoodCalculator::init(const TString& fileName){
     TIter nexthist(dir->GetListOfKeys());
     TKey *keyhist;
     while((keyhist = (TKey*) nexthist())){
-      pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj(); 
+      pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj();
     }
   }
   return true;
@@ -53,33 +53,43 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
 
   float Q=1., G=1.;
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
+    if(vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
 
-    auto qgEntry = findEntry(eta, pt, rho, 0, varIndex);
-    if(!qgEntry) return -1;
-    int binQ = qgEntry->FindBin(vars[varIndex]);
-    float Qi = qgEntry->GetBinContent(binQ)*qgEntry->GetBinWidth(binQ);
-    float mQ = qgEntry->GetMean();
+    auto quarkEntry = findEntry(eta, pt, rho, 0, varIndex);
+    auto gluonEntry = findEntry(eta, pt, rho, 1, varIndex);
+    if(!quarkEntry && !gluonEntry) return -2;
 
-    qgEntry = findEntry(eta, pt, rho, 1, varIndex); 
-    if(!qgEntry) return -1;
-    int binG = qgEntry->FindBin(vars[varIndex]);
-    float Gi = qgEntry->GetBinContent(binG)*qgEntry->GetBinWidth(binG);
-    float mG = qgEntry->GetMean();
+    int binQ = quarkEntry->FindBin(vars[varIndex]);
+    float Qi = quarkEntry->GetBinContent(binQ);
+    float Qw = quarkEntry->GetBinWidth(binQ);
 
-    float epsilon=0;
-    float delta=0.000001;
-    if(Qi <= epsilon && Gi <= epsilon){
-      if(mQ>mG){
-	if(vars[varIndex] > mQ){ Qi = 1-delta; Gi = delta;}
-	else if(vars[varIndex] < mG){ Qi = delta; Gi = 1-delta;}
-      }
-      else if(mQ<mG){
-	if(vars[varIndex]<mQ) { Qi = 1-delta; Gi = delta;}
-	else if(vars[varIndex]>mG){Qi = delta;Gi = 1-delta;}
+    int binG = gluonEntry->FindBin(vars[varIndex]);
+    float Gi = gluonEntry->GetBinContent(binG);
+    float Gw = gluonEntry->GetBinWidth(binG);
+
+    if(Qi <= 0 || Gi <= 0){
+      bool gluonAboveQuark = (quarkEntry->GetMean() < gluonEntry->GetMean());
+
+      if(quarkEntry->Integral(0, binQ) + gluonEntry->Integral(0, binG) <=0){
+        if(gluonAboveQuark){ Qi = 0.999; Gi = 0.001;} else { Qi = 0.001; Gi = 0.999;}
+      } else if(quarkEntry->Integral(binQ, quarkEntry->GetNbinsX() + 1) + gluonEntry->Integral(binG, gluonEntry->GetNbinsX() + 1) <=0){
+        if(gluonAboveQuark){ Qi = 0.001; Gi = 0.999;} else { Qi = 0.999; Gi = 0.001;}
+      } else {
+        int q = 1, g = 1;
+        while(Qi <= 0){
+          Qi += quarkEntry->GetBinContent(binQ+q) + quarkEntry->GetBinContent(binQ-q);
+          Qw += quarkEntry->GetBinWidth(binQ+q) + quarkEntry->GetBinWidth(binQ-q);
+          ++q;
+        }
+        while(Gi <= 0){
+          Gi += gluonEntry->GetBinContent(binG+g) + gluonEntry->GetBinContent(binG-g);
+          Gw += gluonEntry->GetBinWidth(binG+g) + gluonEntry->GetBinWidth(binG-g);
+          ++g;
+        }
       }
     } 
-    Q*=Qi;
-    G*=Gi;	
+    Q*=Qi/Qw;
+    G*=Gi/Gw;
   }
 
   if(Q==0) return 0;
@@ -93,13 +103,14 @@ float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float 
 
   float Q=1., G=1.;
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
+    if(vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
 
     auto quarkEntry = findEntry(eta, pt, rho, 0, varIndex);
     auto gluonEntry = findEntry(eta, pt, rho, 1, varIndex);
-    if(!quarkEntry || !gluonEntry) return -1;
+    if(!quarkEntry || !gluonEntry) return -2;
 
-    float cdfQuark = quarkEntry->Integral(0, quarkEntry->FindBin(vars[varIndex]), "width");
-    float cdfGluon = gluonEntry->Integral(0, gluonEntry->FindBin(vars[varIndex]), "width");
+    float cdfQuark = quarkEntry->Integral(0, quarkEntry->FindBin(vars[varIndex]));
+    float cdfGluon = gluonEntry->Integral(0, gluonEntry->FindBin(vars[varIndex]));
 
     float ccdfQuark = 1.-cdfQuark;
     float ccdfGluon = 1.-cdfGluon;
@@ -107,22 +118,22 @@ float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float 
     float Qi, Gi;
     if(quarkEntry->GetMean() < gluonEntry->GetMean()){
       if(cdfQuark+cdfGluon <= 0){
-        Qi = 0.99;
-        Gi = 0.01;
+        Qi = 0.999;
+        Gi = 0.001;
       } else if(ccdfQuark+ccdfGluon <= 0){
-        Qi = 0.01;
-        Gi = 0.99;
+        Qi = 0.001;
+        Gi = 0.999;
       } else {
         Qi = cdfQuark/(cdfQuark+cdfGluon) - 0.5;
         Gi = ccdfGluon/(ccdfQuark+ccdfGluon) - 0.5;
       }
     } else {
       if(cdfQuark+cdfGluon <= 0){
-        Qi = 0.01;
-        Gi = 0.99;
+        Qi = 0.001;
+        Gi = 0.999;
       } else if(ccdfQuark+ccdfGluon <= 0){
-        Qi = 0.99;
-        Qi = 0.01;
+        Qi = 0.999;
+        Gi = 0.001;
       } else {
         Qi = ccdfQuark/(ccdfQuark+ccdfGluon) - 0.5;
         Gi = cdfGluon/(cdfQuark+cdfGluon) - 0.5;

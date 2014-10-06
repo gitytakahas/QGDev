@@ -1,6 +1,7 @@
 #ifndef binFunctions_h
 #define binFunctions_h
 #include <vector>
+#include <algorithm>
 #include <iostream>
 #include "TVector.h"
 

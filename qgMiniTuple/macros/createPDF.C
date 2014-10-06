@@ -9,7 +9,7 @@
 
 
 int main(int argc, char**argv){
-  bool fineBinning = true;
+  bool fineBinning = false;
 
   // Define binning for pdfs
   std::vector<float> etaBins = {0,2.5,4.7};
@@ -132,7 +132,7 @@ int main(int argc, char**argv){
         else if(maxEmptyBins > 9) pdf.second->Rebin(20);
         else if(maxEmptyBins > 4) pdf.second->Rebin(10);
         else if(maxEmptyBins > 1) pdf.second->Rebin(5);
-        else pdf.second->Rebin(2);
+        else if(maxEmptyBins > 0) pdf.second->Rebin(2);
       }
 
       pdf.second->Scale(1./pdf.second->Integral(0, pdf.second->GetNbinsX() + 1));					// Scale to integral=1 (also include underflow/overflow)

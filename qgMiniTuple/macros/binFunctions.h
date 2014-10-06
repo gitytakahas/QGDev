@@ -49,4 +49,16 @@ bool getBinsFromFile(std::vector<float>& bins, TString name, TFile* f){
   for(int i = 0; i < tbins->GetNoElements(); ++i) bins.push_back((*tbins)[i]);
   return true;
 }
+
+
+// If different PU scenarios are merged, check if event/rho combination was already used (ugly but very efficient code)
+bool eventAlreadyInRhoBin(std::map<int, std::map<int, std::map<int, std::vector<int>*>>>& mymap, int rhoBin, int event){
+  int event_index100 = event % 100;
+  int event_index10000 = (event - event_index100) % 10000;
+  auto myVector = &mymap[rhoBin][event_index10000][event_index100];
+  if(!*myVector) *myVector = new std::vector<int>;
+  else if(std::find((*myVector)->begin(), (*myVector)->end(), event) != (*myVector)->end()) return true;
+  (*myVector)->push_back(event);
+  return false;
+}
 #endif

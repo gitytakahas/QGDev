@@ -25,10 +25,10 @@ QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename){
 bool QGLikelihoodCalculator::init(const TString& fileName){
   f = new TFile(fileName);
   if(f->IsZombie()) 				return false;
-  if(!getBinsFromFile(etaBins, "etaBins", f))	return false;
-  if(!getBinsFromFile(ptBinsC, "ptBinsC", f))	return false;
-  if(!getBinsFromFile(ptBinsF, "ptBinsF", f))	return false;
-  if(!getBinsFromFile(rhoBins, "rhoBins", f))	return false;
+  if(!(this->getBinsFromFile(etaBins, "etaBins")))	return false;
+  if(!(this->getBinsFromFile(ptBinsC, "ptBinsC")))	return false;
+  if(!(this->getBinsFromFile(ptBinsF, "ptBinsF")))	return false;
+  if(!(this->getBinsFromFile(rhoBins, "rhoBins")))	return false;
 
   TList *keys = f->GetListOfKeys();
   if(!keys) return false;
@@ -174,7 +174,7 @@ bool QGLikelihoodCalculator::isValidRange(float pt, float rho, float eta){
 
 
 /// Translates the TVector with the bins to std::vector
-bool QGLikelihoodCalculator::getBinsFromFile(std::vector<float>& bins, const TString& name, TFile* f){
+bool QGLikelihoodCalculator::getBinsFromFile(std::vector<float>& bins, const TString& name ) {
   TVectorT<float> *tbins = nullptr;
   f->GetObject(name, tbins);
   if(!tbins) return false;

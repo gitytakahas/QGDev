@@ -37,7 +37,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void beginJob() override;
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       bool jetId(const reco::PFJet *jet, bool tight = false, bool medium = false);
-      virtual void endJob() override;
+      virtual void endJob() override {};
 
       edm::EDGetTokenT<double> rhoToken;
       edm::EDGetTokenT<reco::PFJetCollection> jetsToken;
@@ -52,11 +52,9 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      std::vector<float> *qg, *pt, *eta, *axis2, *ptD, *deltaR, *bTag;
-      std::vector<int> *mult, *partonId;
-      std::vector<bool> *jetIdLoose, *jetIdMedium, *jetIdTight;
-      float rho;
-      int nRun, nLumi, nEvent;
+      bool jetIdLoose, jetIdMedium, jetIdTight;
+      float rho, qg, pt, eta, axis2, ptD, deltaR, bTag;
+      int nRun, nLumi, nEvent, mult, partonId;
 };
 
 
@@ -79,10 +77,6 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
 
 
 void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
-  for(auto v : {qg, pt, eta, axis2, ptD, deltaR, bTag}) 		v->clear();
-  for(auto v : {mult, partonId}) 				v->clear();
-  for(auto v : {jetIdLoose, jetIdMedium, jetIdTight})		v->clear();
-
   nRun 		= (int) iEvent.id().run();
   nLumi 	= (int) iEvent.id().luminosityBlock();
   nEvent	= (int) iEvent.id().event();
@@ -125,54 +119,42 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     }
 
     if(deltaRmin > deltaRcut) continue;
-    partonId->push_back(matchedGenParticle->pdgId());
-    deltaR->push_back(deltaRmin);
+    partonId	= matchedGenParticle->pdgId();
+    deltaR	= deltaRmin;
 
-    pt->push_back(jet->pt());
-    eta->push_back(jet->eta());
-    qg->push_back((*qgHandle)[jetRef]);
-    axis2->push_back((*axis2Handle)[jetRef]);
-    mult->push_back((*multHandle)[jetRef]);
-    ptD->push_back((*ptDHandle)[jetRef]);
-    bTag->push_back(bTagUsed ? (*bTagHandle)[jetRef] : -1);
+    pt		= jet->pt();
+    eta		= jet->eta();
+    qg		= (*qgHandle)[jetRef];
+    axis2	= (*axis2Handle)[jetRef];
+    mult	= (*multHandle)[jetRef];
+    ptD		= (*ptDHandle)[jetRef];
+    bTag	= (bTagUsed ? (*bTagHandle)[jetRef] : -1);
 
-    jetIdLoose->push_back(jetId(&*jet)); 
-    jetIdMedium->push_back(jetId(&*jet, false, true)); 
-    jetIdTight->push_back(jetId(&*jet, true)); 
+    jetIdLoose	= jetId(&*jet); 
+    jetIdMedium	= jetId(&*jet, false, true); 
+    jetIdTight  = jetId(&*jet, true); 
+    tree->Fill();
   }
-
-  tree->Fill();
 }
 
 void qgMiniTuple::beginJob(){
-  for(auto v : {&qg, &pt, &eta, &axis2, &ptD, &deltaR, &bTag}) 	*v = new std::vector<float>();
-  for(auto v : {&mult, &partonId}) 				*v = new std::vector<int>();
-  for(auto v : {&jetIdLoose, &jetIdMedium, &jetIdTight}) 	*v = new std::vector<bool>();
-
   tree = fs->make<TTree>("qgMiniTuple","qgMiniTuple");
-  tree->Branch("nRun" ,		&nRun, 			"nRun/I");
-  tree->Branch("nLumi" ,	&nLumi, 		"nLumi/I");
-  tree->Branch("nEvent" ,	&nEvent, 		"nEvent/I");
-  tree->Branch("rho" ,		&rho, 			"rho/F");
-  tree->Branch("pt" ,		"vector<float>", 	&pt);
-  tree->Branch("eta",		"vector<float>", 	&eta);
-  tree->Branch("qg",		"vector<float>", 	&qg);
-  tree->Branch("axis2",		"vector<float>", 	&axis2);
-  tree->Branch("ptD",		"vector<float>",	&ptD);
-  tree->Branch("mult",		"vector<int>", 		&mult);
-  tree->Branch("bTag",		"vector<float>", 	&bTag);
-  tree->Branch("partonId",	"vector<int>", 		&partonId);
-  tree->Branch("deltaR",	"vector<float>", 	&deltaR);
-  tree->Branch("jetIdLoose",	"vector<bool>", 	&jetIdLoose);
-  tree->Branch("jetIdMedium",	"vector<bool>", 	&jetIdMedium);
-  tree->Branch("jetIdTight",	"vector<bool>", 	&jetIdTight);
-}
-
-
-void qgMiniTuple::endJob(){
-  for(auto v : {qg, pt, eta, axis2, ptD, deltaR, bTag}) delete v;
-  for(auto v : {mult, partonId}) 			delete v;
-  for(auto v : {jetIdLoose, jetIdMedium, jetIdTight})	delete v;
+  tree->Branch("nRun" ,		&nRun, 		"nRun/I");
+  tree->Branch("nLumi" ,	&nLumi, 	"nLumi/I");
+  tree->Branch("nEvent" ,	&nEvent, 	"nEvent/I");
+  tree->Branch("rho" ,		&rho, 		"rho/F");
+  tree->Branch("pt" ,		&pt,		"pt/F");
+  tree->Branch("eta",		&eta,		"eta/F");
+  tree->Branch("qg",		&qg,		"qg/F");
+  tree->Branch("axis2",		&axis2,		"axis2/F");
+  tree->Branch("ptD",		&ptD,		"ptD/F");
+  tree->Branch("mult",		&mult,		"mult/I");
+  tree->Branch("bTag",		&bTag,		"bTag/F");
+  tree->Branch("partonId",	&partonId,	"partonId/I");
+  tree->Branch("deltaR",	&deltaR,	"deltaR/F");
+  tree->Branch("jetIdLoose",	&jetIdLoose,	"jetIdLoose/O");
+  tree->Branch("jetIdMedium",	&jetIdMedium,	"jetIdMedium/O");
+  tree->Branch("jetIdTight",	&jetIdTight,	"jetIdTight/O");
 }
 
 

@@ -35,7 +35,7 @@ class qgMiniTupleForMiniAOD : public edm::EDAnalyzer{
    private:
       virtual void beginJob() override;
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
-      virtual void endJob() override;
+      virtual void endJob() override {};
       template <class jetClass> void calcVariables(const jetClass *jet, float& axis2, float& ptD, int& mult);
 
       edm::EDGetTokenT<double> rhoToken;
@@ -45,10 +45,8 @@ class qgMiniTupleForMiniAOD : public edm::EDAnalyzer{
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      std::vector<float> *pt, *eta, *axis2, *ptD, *bTag;
-      std::vector<int> *mult, *partonId;
-      float rho;
-      int nRun, nLumi, nEvent;
+      float rho, pt, eta, axis2, ptD, bTag;
+      int nRun, nLumi, nEvent, mult, partonId;
 };
 
 
@@ -61,9 +59,6 @@ qgMiniTupleForMiniAOD::qgMiniTupleForMiniAOD(const edm::ParameterSet& iConfig) :
 
 
 void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
-  for(auto v : {pt, eta, axis2, ptD, bTag}) 	v->clear();
-  for(auto v : {mult, partonId}) 		v->clear();
-
   nRun 		= (int) iEvent.id().run();
   nLumi 	= (int) iEvent.id().luminosityBlock();
   nEvent	= (int) iEvent.id().event();
@@ -77,19 +72,14 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
 
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
     if(jet->pt() < minJetPt) continue;
-    float axis2_, ptD_; int mult_;
-    calcVariables(&*jet, axis2_, ptD_, mult_);
 
-    partonId->push_back(jet->partonFlavour());
-    pt->push_back(jet->pt());
-    eta->push_back(jet->eta());
-    axis2->push_back(axis2_);
-    mult->push_back(mult_);
-    ptD->push_back(ptD_);
-    bTag->push_back(jet->bDiscriminator("combinedInclusiveSecondaryVertexBJetTags"));
+    calcVariables(&*jet, axis2, ptD, mult);
+    partonId	= jet->partonFlavour();
+    pt		= jet->pt();
+    eta		= jet->eta();
+    bTag	= jet->bDiscriminator("combinedInclusiveSecondaryVertexBJetTags");
+    tree->Fill();
   }
-
-  tree->Fill();
 }
 
 
@@ -145,27 +135,18 @@ template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetCla
 
 
 void qgMiniTupleForMiniAOD::beginJob(){
-  for(auto v : {&pt, &eta, &axis2, &ptD, &bTag}) 	*v = new std::vector<float>();
-  for(auto v : {&mult, &partonId}) 			*v = new std::vector<int>();
-
   tree = fs->make<TTree>("qgMiniTupleForMiniAOD","qgMiniTuple");
-  tree->Branch("nRun" ,		&nRun, 			"nRun/I");
-  tree->Branch("nLumi" ,	&nLumi, 		"nLumi/I");
-  tree->Branch("nEvent" ,	&nEvent, 		"nEvent/I");
-  tree->Branch("rho" ,		&rho, 			"rho/F");
-  tree->Branch("pt" ,		"vector<float>", 	&pt);
-  tree->Branch("eta",		"vector<float>", 	&eta);
-  tree->Branch("axis2",		"vector<float>", 	&axis2);
-  tree->Branch("ptD",		"vector<float>",	&ptD);
-  tree->Branch("mult",		"vector<int>", 		&mult);
-  tree->Branch("bTag",		"vector<float>", 	&bTag);
-  tree->Branch("partonId",	"vector<int>", 		&partonId);
-}
-
-
-void qgMiniTupleForMiniAOD::endJob(){
-  for(auto v : {pt, eta, axis2, ptD, bTag}) 	delete v;
-  for(auto v : {mult, partonId})		delete v;
+  tree->Branch("nRun" ,		&nRun, 		"nRun/I");
+  tree->Branch("nLumi" ,	&nLumi, 	"nLumi/I");
+  tree->Branch("nEvent" ,	&nEvent, 	"nEvent/I");
+  tree->Branch("rho" ,		&rho, 		"rho/F");
+  tree->Branch("pt" ,		&pt,		"pt/F");
+  tree->Branch("eta",		&eta,		"eta/F");
+  tree->Branch("axis2",		&axis2,		"axis2/F");
+  tree->Branch("ptD",		&ptD,		"ptD/F");
+  tree->Branch("mult",		&mult,		"mult/I");
+  tree->Branch("bTag",		&bTag,		"bTag/F");
+  tree->Branch("partonId",	&partonId,	"partonId/I");
 }
 
 

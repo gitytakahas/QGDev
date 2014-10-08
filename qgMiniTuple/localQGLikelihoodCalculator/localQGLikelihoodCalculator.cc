@@ -1,6 +1,7 @@
 #include <vector>
 #include <map>
 #include <stdexcept>
+#include <cmath>
 
 #include <TFile.h>
 #include <TKey.h>

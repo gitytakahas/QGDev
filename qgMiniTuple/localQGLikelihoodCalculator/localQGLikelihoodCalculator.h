@@ -21,7 +21,7 @@ class QGLikelihoodCalculator{
     bool init(const TString& fileName);
     TH1F* findEntry(float eta, float pt, float rho, int qgIndex, int varIndex);
     bool isValidRange(float pt, float rho, float eta);
-    bool getBinsFromFile(std::vector<float>& bins, const TString& name, TFile* f);
+    bool getBinsFromFile(std::vector<float>& bins, const TString& name);
     bool getBinNumber(std::vector<float>& bins, float value, int& bin);
 
     std::vector<float> etaBins, ptBinsC, ptBinsF, rhoBins;

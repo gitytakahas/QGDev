@@ -173,7 +173,7 @@ bool QGLikelihoodCalculator::isValidRange(float pt, float rho, float eta){
 
 
 /// Translates the TVector with the bins to std::vector
-bool QGLikelihoodCalculator::getBinsFromFile(std::vector<float>& bins, const TString& name, TFile* f){
+bool QGLikelihoodCalculator::getBinsFromFile(std::vector<float>& bins, const TString& name){
   TVectorT<float> *tbins = nullptr;
   f->GetObject(name, tbins);
   if(!tbins) return false;

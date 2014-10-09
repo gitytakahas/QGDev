@@ -36,7 +36,7 @@ class qgMiniTupleForMiniAOD : public edm::EDAnalyzer{
       virtual void beginJob() override;
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       virtual void endJob() override {};
-      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2, float& ptD, int& mult);
+      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_NoQC, float& ptD_NoQC, int& mult_NoQC);
 
       edm::EDGetTokenT<double> rhoToken;
       edm::EDGetTokenT<pat::JetCollection> jetsToken;
@@ -45,8 +45,8 @@ class qgMiniTupleForMiniAOD : public edm::EDAnalyzer{
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      float rho, pt, eta, axis2, ptD, bTag;
-      int nRun, nLumi, nEvent, mult, partonId;
+      float rho, pt, eta, axis2_NoQC, laxis2_NoQC, ptD_NoQC, bTag;
+      int nRun, nLumi, nEvent, mult_NoQC, partonId;
 };
 
 
@@ -72,8 +72,10 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
 
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
     if(jet->pt() < minJetPt) continue;
+    if(jet->partonFlavour() == 0) continue;
 
-    calcVariables(&*jet, axis2, ptD, mult);
+    calcVariables(&*jet, axis2_NoQC, ptD_NoQC, mult_NoQC);
+    laxis2_NoQC = -std::log(axis2_NoQC);
     partonId	= jet->partonFlavour();
     pt		= jet->pt();
     eta		= jet->eta();
@@ -83,8 +85,8 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
 }
 
 
-/// Calculation of axis2, mult and ptD
-template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_){
+/// Calculation of axis2_NoQC, mult_NoQC and ptD_NoQC
+template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetClass *jet, float& axis2_NoQC_, float& ptD_NoQC_, int& mult_NoQC_){
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
   int nChg_QC = 0, nNeutral_ptCut = 0;
 
@@ -113,11 +115,11 @@ template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetCla
     sum_dphi2 += dphi*dphi*weight;
   }
 
-  //Calculate axis2 and ptD
+  //Calculate axis2_NoQC and ptD_NoQC
   float a = 0., b = 0., c = 0.;
   float ave_deta = 0., ave_dphi = 0., ave_deta2 = 0., ave_dphi2 = 0.;
   if(sum_weight > 0){
-    ptD_ = sqrt(sum_weight)/sum_pt;
+    ptD_NoQC_ = sqrt(sum_weight)/sum_pt;
     ave_deta = sum_deta/sum_weight;
     ave_dphi = sum_dphi/sum_weight;
     ave_deta2 = sum_deta2/sum_weight;
@@ -125,12 +127,12 @@ template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetCla
     a = ave_deta2 - ave_deta*ave_deta;                          
     b = ave_dphi2 - ave_dphi*ave_dphi;                          
     c = -(sum_detadphi/sum_weight - ave_deta*ave_dphi);                
-  } else ptD_ = 0;
+  } else ptD_NoQC_ = 0;
   float delta = sqrt(fabs((a-b)*(a-b)+4*c*c));
-  if(a+b-delta > 0) axis2_ = sqrt(0.5*(a+b-delta));
-  else axis2_ = 0.;
+  if(a+b-delta > 0) axis2_NoQC_ = sqrt(0.5*(a+b-delta));
+  else axis2_NoQC_ = 0.;
 
-  mult_ = (nChg_QC + nNeutral_ptCut);
+  mult_NoQC_ = (nChg_QC + nNeutral_ptCut);
 }
 
 
@@ -142,9 +144,10 @@ void qgMiniTupleForMiniAOD::beginJob(){
   tree->Branch("rho" ,		&rho, 		"rho/F");
   tree->Branch("pt" ,		&pt,		"pt/F");
   tree->Branch("eta",		&eta,		"eta/F");
-  tree->Branch("axis2",		&axis2,		"axis2/F");
-  tree->Branch("ptD",		&ptD,		"ptD/F");
-  tree->Branch("mult",		&mult,		"mult/I");
+  tree->Branch("axis2_NoQC",	&axis2_NoQC,	"axis2_NoQC/F");
+  tree->Branch("laxis2_NoQC",	&laxis2_NoQC,	"laxis2_NoQC/F");
+  tree->Branch("ptD_NoQC",	&ptD_NoQC,	"ptD_NoQC/F");
+  tree->Branch("mult_NoQC",	&mult_NoQC,	"mult_NoQC/I");
   tree->Branch("bTag",		&bTag,		"bTag/F");
   tree->Branch("partonId",	&partonId,	"partonId/I");
 }
@@ -155,12 +158,7 @@ void qgMiniTupleForMiniAOD::fillDescriptions(edm::ConfigurationDescriptions& des
   desc.addUntracked<std::string>("fileName","qgMiniTupleForMiniAOD.root");
   desc.add<edm::InputTag>("rhoInputTag");
   desc.add<edm::InputTag>("jetsInputTag");
-  desc.add<edm::InputTag>("qgVariablesInputTag");
-  desc.add<edm::InputTag>("genParticlesInputTag");
   desc.addUntracked<double>("minJetPt", 10.);
-  desc.addUntracked<double>("deltaRcut", 0.3);
-  desc.addUntracked<bool>("pythia6", false);
-  desc.addUntracked<bool>("bTagUsed", false);
   desc.setUnknown();
   descriptions.addDefault(desc);
 }

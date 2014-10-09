@@ -75,7 +75,7 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
     if(jet->partonFlavour() == 0) continue;
 
     calcVariables(&*jet, axis2_NoQC, ptD_NoQC, mult_NoQC);
-    laxis2_NoQC = -std::log(axis2_NoQC);
+    axis2_NoQC 	= -std::log(axis2_NoQC);
     partonId	= jet->partonFlavour();
     pt		= jet->pt();
     eta		= jet->eta();

@@ -125,8 +125,8 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
     calcVariables(&*jet, axis2, ptD, mult, vertexCollection);
     calcVariables(&*jet, axis2_NoQC, ptD_NoQC, mult_NoQC, vertexCollection, false);
-    laxis2 	= -std::log(axis2);
-    laxis2_NoQC = -std::log(axis2_NoQC);
+    axis2 	= -std::log(axis2);
+    axis2_NoQC 	= -std::log(axis2_NoQC);
 
     jetIdLoose	= jetId(&*jet); 
     jetIdMedium	= jetId(&*jet, false, true); 
@@ -144,11 +144,9 @@ void qgMiniTuple::beginJob(){
   tree->Branch("pt" ,		&pt,		"pt/F");
   tree->Branch("eta",		&eta,		"eta/F");
   tree->Branch("axis2",		&axis2,		"axis2/F");
-  tree->Branch("laxis2",	&laxis2,	"laxis2/F");
   tree->Branch("ptD",		&ptD,		"ptD/F");
   tree->Branch("mult",		&mult,		"mult/I");
   tree->Branch("axis2_NoQC",	&axis2_NoQC,	"axis2_NoQC/F");
-  tree->Branch("laxis2_NoQC",	&laxis2_NoQC,	"laxis2_NoQC/F");
   tree->Branch("ptD_NoQC",	&ptD_NoQC,	"ptD_NoQC/F");
   tree->Branch("mult_NoQC",	&mult_NoQC,	"mult_NoQC/I");
   tree->Branch("bTag",		&bTag,		"bTag/F");

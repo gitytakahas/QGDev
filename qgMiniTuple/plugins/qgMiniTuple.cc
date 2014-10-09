@@ -113,6 +113,8 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     edm::RefToBase<reco::Jet> jetRef(edm::Ref<reco::PFJetCollection>(jets, (jet - jets->begin())));
 
     partonId	= (*jetFlavours)[jetRef].getPartonFlavour();
+    if(partonId == 0) continue;
+
     pt		= jet->pt();
     eta		= jet->eta();
 /*  qg		= (*qgHandle)[jetRef];

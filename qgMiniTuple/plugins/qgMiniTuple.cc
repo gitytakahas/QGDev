@@ -27,6 +27,7 @@
 #include "SimDataFormats/JetMatching/interface/JetFlavourInfoMatching.h"
 #include "DataFormats/Common/interface/ValueMap.h"
 #include "DataFormats/Math/interface/deltaR.h"
+#include "JetMETCorrections/Objects/interface/JetCorrector.h"
 
 #include "TFile.h"
 #include "TTree.h"
@@ -48,6 +49,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::EDGetTokenT<double> rhoToken;
       edm::EDGetTokenT<reco::VertexCollection> vertexToken;
       edm::EDGetTokenT<reco::PFJetCollection> jetsToken;
+      std::string jecService;
       edm::EDGetTokenT<reco::JetFlavourInfoMatchingCollection> jetFlavourToken;
 /*    edm::InputTag qgVariablesInputTag;
       edm::EDGetTokenT<edm::ValueMap<float>> qgToken, axis2Token, ptDToken;
@@ -55,6 +57,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::EDGetTokenT<reco::JetTagCollection> bTagToken;
       const double minJetPt;
 
+      const JetCorrector *JEC;
       edm::Service<TFileService> fs;
       TTree *tree;
 
@@ -68,6 +71,7 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
   rhoToken( 		consumes<double>(					iConfig.getParameter<edm::InputTag>("rhoInputTag"))),
   vertexToken(    	consumes<reco::VertexCollection>(			iConfig.getParameter<edm::InputTag>("vertexInputTag"))),
   jetsToken(    	consumes<reco::PFJetCollection>(			iConfig.getParameter<edm::InputTag>("jetsInputTag"))),
+  jecService( 									iConfig.getParameter<std::string>("jec")),
   jetFlavourToken(	consumes<reco::JetFlavourInfoMatchingCollection>( 	iConfig.getParameter<edm::InputTag>("jetFlavourInputTag"))),
   bTagToken(		consumes<reco::JetTagCollection>(       		iConfig.getParameter<edm::InputTag>("csvInputTag"))),
 //qgVariablesInputTag(  							iConfig.getParameter<edm::InputTag>("qgVariablesInputTag")),
@@ -92,6 +96,8 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
   edm::Handle<reco::PFJetCollection> jets;
   iEvent.getByToken(jetsToken, jets);
 
+  JEC = JetCorrector::getJetCorrector(jecService, iSetup);
+
   edm::Handle<reco::JetFlavourInfoMatchingCollection> jetFlavours;
   iEvent.getByToken(jetFlavourToken, jetFlavours);
 
@@ -115,7 +121,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     partonId	= (*jetFlavours)[jetRef].getPartonFlavour();
     if(partonId == 0) continue;
 
-    pt		= jet->pt();
+    pt		= jet->pt()*JEC->correction(*jet, iEvent, iSetup);
     eta		= jet->eta();
 /*  qg		= (*qgHandle)[jetRef];
     axis2	= (*axis2Handle)[jetRef];
@@ -255,6 +261,7 @@ void qgMiniTuple::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
   desc.add<edm::InputTag>("rhoInputTag");
   desc.add<edm::InputTag>("vertexInputTag");
   desc.add<edm::InputTag>("jetsInputTag");
+  desc.add<std::string>("jec");
   desc.add<edm::InputTag>("jetFlavourInputTag");
 //desc.add<edm::InputTag>("qgVariablesInputTag");
   desc.addUntracked<double>("minJetPt", 10.);

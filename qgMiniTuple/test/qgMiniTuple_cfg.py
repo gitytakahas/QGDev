@@ -29,33 +29,17 @@ process.TFileService = cms.Service("TFileService",
 # To do: add puppi jets when CMSSW recipe is available
 process.load('RecoJets.Configuration.RecoPFJets_cff')
 process.ak7PFJetsCHS = process.ak4PFJetsCHS.clone(rParam = 0.7) 
-process.myRecoPFJets = cms.Sequence(process.fixedGridRhoAll +
-                                    process.fixedGridRhoFastjetAll +
-                                    process.fixedGridRhoFastjetCentralChargedPileUp +
-                                    process.fixedGridRhoFastjetCentralNeutral +
-                                    process.pfNoPileUpJMESequence +
-                                    process.ak4PFJets + process.ak4PFJetsCHS + 
-                                    process.ak5PFJets + process.ak5PFJetsCHS +
-                                    process.ak7PFJets + process.ak7PFJetsCHS
+process.myRecoPFJets = cms.Sequence(process.fixedGridRhoFastjetAll + process.pfNoPileUpJMESequence +
+#                                   process.ak5PFJets + process.ak5PFJetsCHS +
+#                                   process.ak7PFJets + process.ak7PFJetsCHS +
+                                    process.ak4PFJets + process.ak4PFJetsCHS
 )
 
-
-# Jet energy corrections [do not waste time on these corrections, they are not available with the PLS170_V6AN1 global tag]
-process.load('JetMETCorrections.Configuration.DefaultJEC_cff')
-process.ak4PFJetsL1FastL2L3 	= process.ak5PFJetsL2L3.clone(src = 'ak4PFJets',    correctors = ['ak4PFL1FastL2L3'])
-process.ak7PFJetsL1FastL2L3    	= process.ak5PFJetsL2L3.clone(src = 'ak7PFJets',    correctors = ['ak7PFL1FastL2L3'])
-process.ak4PFchsJetsL1FastL2L3 	= process.ak5PFJetsL2L3.clone(src = 'ak4PFJetsCHS', correctors = ['ak4PFCHSL1FastL2L3'])
-process.ak5PFchsJetsL1FastL2L3 	= process.ak5PFJetsL2L3.clone(src = 'ak5PFJetsCHS', correctors = ['ak5PFCHSL1FastL2L3'])
-process.ak7PFchsJetsL1FastL2L3 	= process.ak5PFJetsL2L3.clone(src = 'ak7PFJetsCHS', correctors = ['ak7PFCHSL1FastL2L3'])
-
+# Jet energy corrections
+process.load('QGDev.qgMiniTuple.correctionSources_cff')
 
 # b-tagging
-process.load('QGDev.qgMiniTuple.RecoBTagAK4_cff')
-process.load('QGDev.qgMiniTuple.RecoBTagAK5_cff')
-process.load('QGDev.qgMiniTuple.RecoBTagAK7_cff')
-process.load('QGDev.qgMiniTuple.RecoBTagAK4CHS_cff')
-process.load('QGDev.qgMiniTuple.RecoBTagAK5CHS_cff')
-process.load('QGDev.qgMiniTuple.RecoBTagAK7CHS_cff')
+for jetCollection in ['AK4','AK5','AK7','AK4CHS','AK5CHS','AK7CHS']: process.load('QGDev.qgMiniTuple.RecoBTag' + jetCollection + '_cff')
 
 # Flavour matching
 process.selectedHadronsAndPartons = cms.EDProducer('HadronAndPartonSelector',
@@ -91,25 +75,20 @@ process.qgMiniTupleAK4 = cms.EDAnalyzer("qgMiniTuple",
     rhoInputTag			= cms.InputTag('fixedGridRhoFastjetAll'),
     vertexInputTag		= cms.InputTag('offlinePrimaryVerticesWithBS'),
     jetsInputTag		= cms.InputTag('ak4PFJets'),
+    jec				= cms.string('ak4PFL1FastL2L3'),
     jetFlavourInputTag		= cms.InputTag('jetFlavourInfosAK4'),
     csvInputTag			= cms.InputTag('ak4CombinedSecondaryVertexBJetTags'),
 #   qgVariablesInputTag		= cms.InputTag('QGTaggerAK4'),
     minJetPt			= cms.untracked.double(20.),
 )
-process.qgMiniTupleAK5 		= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak5PFJets',	jetFlavourInputTag = 'jetFlavourInfosAK5',	csvInputTag = 'ak5CombinedSecondaryVertexBJetTags')#,    qgVariablesInputTag = 'QGTaggerAK5')
-process.qgMiniTupleAK7 		= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak7PFJets',	jetFlavourInputTag = 'jetFlavourInfosAK7',	csvInputTag = 'ak7CombinedSecondaryVertexBJetTags')#,    qgVariablesInputTag = 'QGTaggerAK7')
-process.qgMiniTupleAK4chs 	= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak4PFJetsCHS',	jetFlavourInputTag = 'jetFlavourInfosAK4CHS',	csvInputTag = 'ak4CHSCombinedSecondaryVertexBJetTags')#, qgVariablesInputTag = 'QGTaggerAK4chs')
-process.qgMiniTupleAK5chs 	= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak5PFJetsCHS',	jetFlavourInputTag = 'jetFlavourInfosAK5CHS',	csvInputTag = 'ak5CHSCombinedSecondaryVertexBJetTags')#, qgVariablesInputTag = 'QGTaggerAK5chs')
-process.qgMiniTupleAK7chs 	= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak7PFJetsCHS',	jetFlavourInputTag = 'jetFlavourInfosAK7CHS',	csvInputTag = 'ak7CHSCombinedSecondaryVertexBJetTags')#, qgVariablesInputTag = 'QGTaggerAK7chs')
-
-#process.qgMiniTupleAK4chs.bTagUsed = cms.untracked.bool(True)
-
+process.qgMiniTupleAK5 		= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak5PFJets',	jec = 'ak5PFL1FastL2L3',	jetFlavourInputTag = 'jetFlavourInfosAK5',	csvInputTag = 'ak5CombinedSecondaryVertexBJetTags')#,    qgVariablesInputTag = 'QGTaggerAK5')
+process.qgMiniTupleAK7 		= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak7PFJets',	jec = 'ak7PFL1FastL2L3',	jetFlavourInputTag = 'jetFlavourInfosAK7',	csvInputTag = 'ak7CombinedSecondaryVertexBJetTags')#,    qgVariablesInputTag = 'QGTaggerAK7')
+process.qgMiniTupleAK4chs 	= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak4PFJetsCHS',	jec = 'ak4PFCHSL1FastL2L3',	jetFlavourInputTag = 'jetFlavourInfosAK4CHS',	csvInputTag = 'ak4CHSCombinedSecondaryVertexBJetTags')#, qgVariablesInputTag = 'QGTaggerAK4chs')
+process.qgMiniTupleAK5chs 	= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak4PFJetsCHS',	jec = 'ak5PFCHSL1FastL2L3',	jetFlavourInputTag = 'jetFlavourInfosAK5CHS',	csvInputTag = 'ak5CHSCombinedSecondaryVertexBJetTags')#, qgVariablesInputTag = 'QGTaggerAK5chs')
+process.qgMiniTupleAK7chs 	= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak4PFJetsCHS',	jec = 'ak7PFCHSL1FastL2L3',	jetFlavourInputTag = 'jetFlavourInfosAK7CHS',	csvInputTag = 'ak7CHSCombinedSecondaryVertexBJetTags')#, qgVariablesInputTag = 'QGTaggerAK7chs')
 
 # The path: jet sequence + b tagging + (QGTagger + qgMiniTuple) for every jet collection
 process.p = cms.Path(process.myRecoPFJets *
-#                     process.ak4PFJetsL1FastL2L3 * process.ak4PFchsJetsL1FastL2L3 *
-#                     process.ak5PFJetsL1FastL2L3 * process.ak5PFchsJetsL1FastL2L3 *
-#                     process.ak7PFJetsL1FastL2L3 * process.ak7PFJetsL1FastL2L3 *
                      process.ak4BTagging * process.ak4CHSBTagging *
 #                     process.ak5BTagging * process.ak5CHSBTagging *
 #                     process.ak7BTagging * process.ak7CHSBTagging *
@@ -117,7 +96,8 @@ process.p = cms.Path(process.myRecoPFJets *
                      process.jetFlavourInfosAK4 * process.jetFlavourInfosAK4CHS *
 #                     process.jetFlavourInfosAK5 * process.jetFlavourInfosAK5CHS *
 #                     process.jetFlavourInfosAK7 * process.jetFlavourInfosAK7CHS *
-                     process.qgMiniTupleAK4 * process.qgMiniTupleAK4chs *
+                     process.qgMiniTupleAK4 * process.qgMiniTupleAK4chs #*
 #                     process.qgMiniTupleAK5 * process.qgMiniTupleAK5chs *
-#                     process.qgMiniTupleAK7 * process.qgMiniTupleAK7chs)
+#                     process.qgMiniTupleAK7 * process.qgMiniTupleAK7chs
+                    )
 

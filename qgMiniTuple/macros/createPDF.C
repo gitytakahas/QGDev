@@ -10,12 +10,13 @@
 
 int main(int argc, char**argv){
   bool fineBinning = false;
+  TString qualityCut = "";
 
   // Define binning for pdfs
   std::vector<float> etaBins = {0,2.5,4.7};
   std::vector<float> ptBinsC; getBins(ptBinsC, 20, 20, 2000, true); ptBinsC.push_back(4000);
   std::vector<float> ptBinsF; getBins(ptBinsF, 20, 20, 2000, true); ptBinsF.erase(ptBinsF.end() - 12, ptBinsF.end()); ptBinsF.push_back(4000);
-  std::vector<float> rhoBins; getBins(rhoBins, 40, 0, 40, false); rhoBins.push_back(42); rhoBins.push_back(44); rhoBins.push_back(50);
+  std::vector<float> rhoBins; getBins(rhoBins, 36, 4, 40, false); rhoBins.push_back(42); rhoBins.push_back(44); rhoBins.push_back(50);
 
   printBins("eta", etaBins);
   printBins("pt (central)", ptBinsC);
@@ -23,33 +24,27 @@ int main(int argc, char**argv){
   printBins("rho", rhoBins); std::cout << std::endl;
 
   // For different jet types
-  for(TString jetType : {"AK4","AK4chs","AK4chs_antib","AK5","AK5chs","AK7","AK7chs"}){
+  for(TString jetType : {"AK4","AK4chs","AK4chs_antib"}){//,"AK5","AK5chs","AK7","AK7chs"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
     TString treePath = "qgMiniTuple"+jetType+"/qgMiniTuple";
     treePath.ReplaceAll("_antib","");
 
     // Init qgMiniTuple
-    TFile *qgMiniTupleFile = new TFile("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_AllPU.root");
+    TFile *qgMiniTupleFile = new TFile("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14_New.root");
     TTree *qgMiniTuple; qgMiniTupleFile->GetObject(treePath, qgMiniTuple);
-    float rho; int event;
-    std::vector<float> *pt 		= nullptr;
-    std::vector<float> *eta 		= nullptr;
-    std::vector<float> *axis2 		= nullptr;
-    std::vector<float> *ptD 		= nullptr;
-    std::vector<float> *bTag 		= nullptr;
-    std::vector<int> *mult 		= nullptr;
-    std::vector<int> *partonId 		= nullptr;
-    std::vector<bool> *jetIdLoose 	= nullptr;
-    qgMiniTuple->SetBranchAddress("rho", 	&rho);
-    qgMiniTuple->SetBranchAddress("nEvent", 	&event);
-    qgMiniTuple->SetBranchAddress("pt", 	&pt);
-    qgMiniTuple->SetBranchAddress("eta", 	&eta);
-    qgMiniTuple->SetBranchAddress("axis2", 	&axis2);
-    qgMiniTuple->SetBranchAddress("ptD", 	&ptD);
-    qgMiniTuple->SetBranchAddress("mult", 	&mult);
-    qgMiniTuple->SetBranchAddress("bTag", 	&bTag);
-    qgMiniTuple->SetBranchAddress("partonId", 	&partonId);
-    qgMiniTuple->SetBranchAddress("jetIdLoose", &jetIdLoose);
+    float rho, pt, eta, axis2, ptD, bTag; 
+    int event, mult, partonId; 
+    bool jetIdLoose;
+    qgMiniTuple->SetBranchAddress("rho", 		&rho);
+    qgMiniTuple->SetBranchAddress("nEvent", 		&event);
+    qgMiniTuple->SetBranchAddress("pt", 		&pt);
+    qgMiniTuple->SetBranchAddress("eta",	 	&eta);
+    qgMiniTuple->SetBranchAddress("axis2"+qualityCut, 	&axis2);
+    qgMiniTuple->SetBranchAddress("ptD"+qualityCut, 	&ptD);
+    qgMiniTuple->SetBranchAddress("mult"+qualityCut, 	&mult);
+    qgMiniTuple->SetBranchAddress("bTag", 		&bTag);
+    qgMiniTuple->SetBranchAddress("partonId", 		&partonId);
+    qgMiniTuple->SetBranchAddress("jetIdLoose",	 &jetIdLoose);
 
     // Creation of the pdfs
     std::map<TString, TH1F*> pdfs;
@@ -67,35 +62,32 @@ int main(int argc, char**argv){
     }
 
     // Fill pdfs
-    std::map<int, std::map<int, std::map<int, std::vector<int>*>>> eventsWithRho;
-    int countDoubles = 0;
+//    std::map<int, std::map<int, std::map<int, std::vector<int>*>>> eventsWithRho;
+//    int countDoubles = 0;
     for(int i = 0; i < qgMiniTuple->GetEntries(); ++i){
       qgMiniTuple->GetEntry(i);
-      int rhoBin;
-      if(!getBinNumber(rhoBins, rho, rhoBin)) continue;
-      if(eventAlreadyInRhoBin(eventsWithRho, rhoBin, event)){ ++countDoubles; continue;}
-      for(int j = 0; j < pt->size(); ++j){
-        if(!jetIdLoose->at(j)) continue;
-        if(fabs(partonId->at(j)) > 3 && partonId->at(j) != 21) continue;						// Keep only udsg
-        if(jetType.Contains("antib") && bTag->at(j) > 0.423) continue;
-        TString type = (partonId->at(j) == 21? "gluon" : "quark");							// Define q/g
+      int rhoBin, etaBin, ptBin;
+      if(!getBinNumber(rhoBins, rho, rhoBin)) 					continue;
+      if(!getBinNumber(etaBins, fabs(eta), etaBin)) 				continue;
+      if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt, ptBin)) 		continue;
+//      if(eventAlreadyInRhoBin(eventsWithRho, rhoBin, event)){ ++countDoubles; continue;}
 
-        int etaBin, ptBin;												// Calculate bin numbers
-        if(!getBinNumber(etaBins, fabs(eta->at(j)), etaBin)) 			continue;
-        if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt->at(j), ptBin)) 	continue;
+      if(!jetIdLoose) continue;
+      if((fabs(partonId) > 3 && partonId != 21) || partonId == 0) continue;						// Keep only udsg
+      if(jetType.Contains("antib") && bTag > 0.423) continue;
+      TString type = (partonId == 21? "gluon" : "quark");								// Define q/g
 
-        if(fabs(eta->at(j)) > 2 && fabs(eta->at(j)) < 3) 			continue;				// Don't use 2 < |eta| < 3
-        TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-        pdfs["axis2" + histName]->Fill(-std::log(axis2->at(j)));							// QGTagger uses -log(axis2) as pdf
-        pdfs["ptD"   + histName]->Fill(ptD->at(j));
-        pdfs["mult"  + histName]->Fill(mult->at(j));
-      }
+      if(fabs(eta) > 2 && fabs(eta) < 3) 	continue;								// Don't use 2 < |eta| < 3
+      TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
+      pdfs["axis2" + histName]->Fill(-std::log(axis2));								// QGTagger uses -log(axis2) as pdf
+      pdfs["ptD"   + histName]->Fill(ptD);
+      pdfs["mult"  + histName]->Fill(mult);
     }
-    for(auto& i : eventsWithRho) for(auto& j : i.second) for(auto& k : j.second) delete k.second;
-    std::cout << countDoubles << " doubles on a total of " << qgMiniTuple->GetEntries() << std::endl;
+//    for(auto& i : eventsWithRho) for(auto& j : i.second) for(auto& k : j.second) delete k.second;
+//    std::cout << countDoubles << " doubles on a total of " << qgMiniTuple->GetEntries() << std::endl;
 
     // Write pdfs and binning to file
-    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV.root","RECREATE");
+    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + qualityCut + "_13TeV.root","RECREATE");
     pdfFile->cd();
     writeBinsToFile(etaBins, "etaBins");
     writeBinsToFile(ptBinsC, "ptBinsC");

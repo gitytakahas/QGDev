@@ -50,6 +50,7 @@ bool QGLikelihoodCalculator::init(const TString& fileName){
 
 /// Compute the QGLikelihood, given the pT, eta, rho and likelihood variables vector
 float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars){
+  eta = fabs(eta);
   if(!isValidRange(pt, rho, eta)) return -1;
 
   float Q=1., G=1.;

@@ -9,14 +9,14 @@
 
 
 int main(int argc, char**argv){
-  bool fineBinning = false;
+  bool fineBinning = true;
   TString qualityCut = "";
 
   // Define binning for pdfs
   std::vector<float> etaBins = {0,2.5,4.7};
   std::vector<float> ptBinsC; getBins(ptBinsC, 20, 20, 2000, true); ptBinsC.push_back(4000);
   std::vector<float> ptBinsF; getBins(ptBinsF, 20, 20, 2000, true); ptBinsF.erase(ptBinsF.end() - 12, ptBinsF.end()); ptBinsF.push_back(4000);
-  std::vector<float> rhoBins; getBins(rhoBins, 36, 4, 40, false); rhoBins.push_back(42); rhoBins.push_back(44); rhoBins.push_back(50);
+  std::vector<float> rhoBins; getBins(rhoBins, 40, 0, 40, false); rhoBins.push_back(42); rhoBins.push_back(44); rhoBins.push_back(50);
 
   printBins("eta", etaBins);
   printBins("pt (central)", ptBinsC);
@@ -30,11 +30,11 @@ int main(int argc, char**argv){
     treePath.ReplaceAll("_antib","");
 
     // Init qgMiniTuple
-    TFile *qgMiniTupleFile = new TFile("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14_New.root");
+    TFile *qgMiniTupleFile = new TFile("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_AllPU.root");
     TTree *qgMiniTuple; qgMiniTupleFile->GetObject(treePath, qgMiniTuple);
     float rho, pt, eta, axis2, ptD, bTag; 
-    int event, mult, partonId; 
-    bool jetIdLoose;
+    int event, mult, partonId, jetIdLevel;
+    bool hasGenJet, matchedJet;
     qgMiniTuple->SetBranchAddress("rho", 		&rho);
     qgMiniTuple->SetBranchAddress("nEvent", 		&event);
     qgMiniTuple->SetBranchAddress("pt", 		&pt);
@@ -44,7 +44,9 @@ int main(int argc, char**argv){
     qgMiniTuple->SetBranchAddress("mult"+qualityCut, 	&mult);
     qgMiniTuple->SetBranchAddress("bTag", 		&bTag);
     qgMiniTuple->SetBranchAddress("partonId", 		&partonId);
-    qgMiniTuple->SetBranchAddress("jetIdLoose",	 &jetIdLoose);
+    qgMiniTuple->SetBranchAddress("jetIdLevel",	 	&jetIdLevel);
+    qgMiniTuple->SetBranchAddress("hasGenJet",	 	&hasGenJet);
+    qgMiniTuple->SetBranchAddress("matchedJet",	 	&matchedJet);
 
     // Creation of the pdfs
     std::map<TString, TH1F*> pdfs;
@@ -62,29 +64,39 @@ int main(int argc, char**argv){
     }
 
     // Fill pdfs
-//    std::map<int, std::map<int, std::map<int, std::vector<int>*>>> eventsWithRho;
-//    int countDoubles = 0;
+    std::map<int, std::map<int, std::map<int, std::vector<int>*>>> eventsWithRho;
+    int countDoubles = 0;
+    int lastEvent = 0;
+    bool skipEvent = false;
     for(int i = 0; i < qgMiniTuple->GetEntries(); ++i){
       qgMiniTuple->GetEntry(i);
       int rhoBin, etaBin, ptBin;
       if(!getBinNumber(rhoBins, rho, rhoBin)) 					continue;
       if(!getBinNumber(etaBins, fabs(eta), etaBin)) 				continue;
       if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt, ptBin)) 		continue;
-//      if(eventAlreadyInRhoBin(eventsWithRho, rhoBin, event)){ ++countDoubles; continue;}
 
-      if(!jetIdLoose) continue;
+      if(lastEvent != event){												// A bit more complicated and less efficient because of our switch to flat trees
+        lastEvent = event;
+        if(eventAlreadyInRhoBin(eventsWithRho, rhoBin, event)){ ++countDoubles; skipEvent = true;}
+        else skipEvent = false;
+      }
+      if(skipEvent) continue;
+
+      if(jetIdLevel < 3) continue;											// Select tight jets
+      if(!hasGenJet || !matchedJet) continue;										// Use only jets matched to gen jet and gen particle
       if((fabs(partonId) > 3 && partonId != 21) || partonId == 0) continue;						// Keep only udsg
-      if(jetType.Contains("antib") && bTag > 0.423) continue;
+      if(jetType.Contains("antib") && bTag >  0.405) continue;								// Anti-b tagging
+      if(fabs(eta) > 2 && fabs(eta) < 3) continue;									// Don't use 2 < |eta| < 3
+
       TString type = (partonId == 21? "gluon" : "quark");								// Define q/g
 
-      if(fabs(eta) > 2 && fabs(eta) < 3) 	continue;								// Don't use 2 < |eta| < 3
       TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-      pdfs["axis2" + histName]->Fill(-std::log(axis2));								// QGTagger uses -log(axis2) as pdf
+      pdfs["axis2" + histName]->Fill(axis2);										// "axis2" already contains the log
       pdfs["ptD"   + histName]->Fill(ptD);
       pdfs["mult"  + histName]->Fill(mult);
     }
-//    for(auto& i : eventsWithRho) for(auto& j : i.second) for(auto& k : j.second) delete k.second;
-//    std::cout << countDoubles << " doubles on a total of " << qgMiniTuple->GetEntries() << std::endl;
+    for(auto& i : eventsWithRho) for(auto& j : i.second) for(auto& k : j.second) delete k.second;
+    std::cout << countDoubles << " doubles on a total of " << qgMiniTuple->GetEntries() << std::endl;
 
     // Write pdfs and binning to file
     TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + qualityCut + "_13TeV.root","RECREATE");

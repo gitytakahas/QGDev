@@ -46,7 +46,7 @@ class qgMiniTupleForMiniAOD : public edm::EDAnalyzer{
       TTree *tree;
 
       float rho, pt, eta, axis2_NoQC, laxis2_NoQC, ptD_NoQC, bTag;
-      int nRun, nLumi, nEvent, mult_NoQC, partonId;
+      int nRun, nLumi, nEvent, mult_NoQC, partonFlavour;
 };
 
 
@@ -75,11 +75,17 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
     if(jet->partonFlavour() == 0) continue;
 
     calcVariables(&*jet, axis2_NoQC, ptD_NoQC, mult_NoQC);
-    axis2_NoQC 	= -std::log(axis2_NoQC);
-    partonId	= jet->partonFlavour();
-    pt		= jet->pt();
-    eta		= jet->eta();
-    bTag	= jet->bDiscriminator("combinedInclusiveSecondaryVertexBJetTags");
+    axis2_NoQC 		= -std::log(axis2_NoQC);
+    partonFlavour	= jet->partonFlavour();
+    pt			= jet->pt();
+    eta			= jet->eta();
+    bTag		= jet->bDiscriminator("combinedInclusiveSecondaryVertexBJetTags");
+
+    for(int i : {nRun, nLumi, nEvent}) 		std::cout << std::setw(10) << i << "\t";
+    for(float i : {rho, pt, eta}) 		std::cout << std::setw(10) << i << "\t";
+    for(int i : {partonFlavour, mult_NoQC})	std::cout << std::setw(10) << i << "\t";
+    for(float i : {ptD_NoQC, axis2_NoQC})	std::cout << std::setw(10) << i << "\t";
+    std::cout << std::endl;
     tree->Fill();
   }
 }
@@ -149,7 +155,7 @@ void qgMiniTupleForMiniAOD::beginJob(){
   tree->Branch("ptD_NoQC",	&ptD_NoQC,	"ptD_NoQC/F");
   tree->Branch("mult_NoQC",	&mult_NoQC,	"mult_NoQC/I");
   tree->Branch("bTag",		&bTag,		"bTag/F");
-  tree->Branch("partonId",	&partonId,	"partonId/I");
+  tree->Branch("partonFlavour",	&partonFlavour,	"partonFlavour/I");
 }
 
 

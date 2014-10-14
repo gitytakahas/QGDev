@@ -36,24 +36,33 @@ class qgMiniTupleForMiniAOD : public edm::EDAnalyzer{
       virtual void beginJob() override;
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       virtual void endJob() override {};
-      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_NoQC, float& ptD_NoQC, int& mult_NoQC);
+      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_);
 
       edm::EDGetTokenT<double> rhoToken;
       edm::EDGetTokenT<pat::JetCollection> jetsToken;
+      edm::EDGetTokenT<reco::GenJetCollection> genJetsToken;
+      edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken;
       const double minJetPt;
+      const double deltaRcut;
+      const bool pythia6;
 
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      float rho, pt, eta, axis2_NoQC, laxis2_NoQC, ptD_NoQC, bTag;
-      int nRun, nLumi, nEvent, mult_NoQC, partonFlavour;
+      float rho, pt, eta, axis2, ptD, bTag;
+      int nRun, nLumi, nEvent, mult, partonFlavour, partonId;
+      bool hasGenJet, matchedJet;
 };
 
 
 qgMiniTupleForMiniAOD::qgMiniTupleForMiniAOD(const edm::ParameterSet& iConfig) :
   rhoToken( 		consumes<double>(			iConfig.getParameter<edm::InputTag>("rhoInputTag"))),
   jetsToken(    	consumes<pat::JetCollection>(		iConfig.getParameter<edm::InputTag>("jetsInputTag"))),
-  minJetPt(							iConfig.getUntrackedParameter<double>("minJetPt", 10.))
+  genJetsToken(    	consumes<reco::GenJetCollection>(	iConfig.getParameter<edm::InputTag>("genJetsInputTag"))),
+  genParticlesToken(    consumes<reco::GenParticleCollection>(	iConfig.getParameter<edm::InputTag>("genParticlesInputTag"))),
+  minJetPt(							iConfig.getUntrackedParameter<double>("minJetPt", 10.)),
+  deltaRcut(							iConfig.getUntrackedParameter<double>("deltaRcut", 0.3)),
+  pythia6(							iConfig.getUntrackedParameter<bool>("pythia6", false))
 {
 }
 
@@ -63,36 +72,51 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
   nLumi 	= (int) iEvent.id().luminosityBlock();
   nEvent	= (int) iEvent.id().event();
 
-  edm::Handle<double> rho_;
-  iEvent.getByToken(rhoToken, rho_);
-  rho = (float) *rho_;
+  edm::Handle<double> rhoHandle;					iEvent.getByToken(rhoToken, 		rhoHandle);
+  edm::Handle<pat::JetCollection> jets;					iEvent.getByToken(jetsToken, 		jets);
+  edm::Handle<reco::GenJetCollection> genJets;				iEvent.getByToken(genJetsToken, 	genJets);
+  edm::Handle<reco::GenParticleCollection> genParticles;		iEvent.getByToken(genParticlesToken, 	genParticles);
 
-  edm::Handle<pat::JetCollection> jets;
-  iEvent.getByToken(jetsToken, jets);
-
+  rho = (float) *rhoHandle;
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
     if(jet->pt() < minJetPt) continue;
-    if(jet->partonFlavour() == 0) continue;
 
-    calcVariables(&*jet, axis2_NoQC, ptD_NoQC, mult_NoQC);
-    axis2_NoQC 		= -std::log(axis2_NoQC);
+    hasGenJet = false;
+    for(auto genJet = genJets->begin(); genJet != genJets->end() && !hasGenJet; ++genJet){
+      if(reco::deltaR(*jet, *genJet) < deltaRcut) hasGenJet = true;
+    }
+
+    partonId = 0; matchedJet = false;
+    float deltaRmin = 999;
+    auto matchedGenParticle = genParticles->end();
+    for(auto genParticle = genParticles->begin(); genParticle != genParticles->end(); ++genParticle){
+      if(genParticle->status() != (pythia6? 3 : 23)) continue; 							//status 3 (pythia6) / status 23 (pythia8) for outgoing particles from the hardest subprocess
+      if(abs(genParticle->pdgId()) > 5 && abs(genParticle->pdgId()) != 21) continue;				//Only keep quarks and gluons
+      float thisDeltaR = reco::deltaR(genParticle->eta(), genParticle->phi(), jet->eta(), jet->phi());
+      if(thisDeltaR < deltaRmin){
+        deltaRmin = thisDeltaR;
+        matchedGenParticle = genParticle;
+      }
+    }
+    if(deltaRmin < deltaRcut){
+      partonId 		= matchedGenParticle->pdgId();
+      matchedJet	= true;
+    }
+
+    calcVariables(&*jet, axis2, ptD, mult);
+    axis2 		= -std::log(axis2);
     partonFlavour	= jet->partonFlavour();
     pt			= jet->pt();
     eta			= jet->eta();
-    bTag		= jet->bDiscriminator("combinedInclusiveSecondaryVertexBJetTags");
+    bTag		= jet->bDiscriminator("combinedSecondaryVertexBJetTags");
 
-    for(int i : {nRun, nLumi, nEvent}) 		std::cout << std::setw(10) << i << "\t";
-    for(float i : {rho, pt, eta}) 		std::cout << std::setw(10) << i << "\t";
-    for(int i : {partonFlavour, mult_NoQC})	std::cout << std::setw(10) << i << "\t";
-    for(float i : {ptD_NoQC, axis2_NoQC})	std::cout << std::setw(10) << i << "\t";
-    std::cout << std::endl;
     tree->Fill();
   }
 }
 
 
-/// Calculation of axis2_NoQC, mult_NoQC and ptD_NoQC
-template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetClass *jet, float& axis2_NoQC_, float& ptD_NoQC_, int& mult_NoQC_){
+/// Calculation of axis2_, mult_ and ptD_
+template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_){
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
   int nChg_QC = 0, nNeutral_ptCut = 0;
 
@@ -100,12 +124,9 @@ template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetCla
   for(int i = 0; i < jet->numberOfDaughters(); ++i){
     auto part = dynamic_cast<const pat::PackedCandidate*> (jet->daughter(i));
     if(part->charge()){
-      if(part->fromPV() > 0 && part->trackHighPurity()){								// fromPV > 0 should always be the case for CHS
-        nChg_QC++;
-      } else continue;
-    } else {
-      if(part->pt() > 1.0) nNeutral_ptCut++;
-    }
+      if(part->fromPV() > 1 && part->trackHighPurity()) nChg_QC++;
+      else continue;
+    } else if(part->pt() > 1.0) nNeutral_ptCut++;
 	  
     float deta = part->eta() - jet->eta();
     float dphi = reco::deltaPhi(part->phi(), jet->phi());
@@ -121,11 +142,11 @@ template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetCla
     sum_dphi2 += dphi*dphi*weight;
   }
 
-  //Calculate axis2_NoQC and ptD_NoQC
+  //Calculate axis2_ and ptD_
   float a = 0., b = 0., c = 0.;
   float ave_deta = 0., ave_dphi = 0., ave_deta2 = 0., ave_dphi2 = 0.;
   if(sum_weight > 0){
-    ptD_NoQC_ = sqrt(sum_weight)/sum_pt;
+    ptD_ = sqrt(sum_weight)/sum_pt;
     ave_deta = sum_deta/sum_weight;
     ave_dphi = sum_dphi/sum_weight;
     ave_deta2 = sum_deta2/sum_weight;
@@ -133,12 +154,12 @@ template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetCla
     a = ave_deta2 - ave_deta*ave_deta;                          
     b = ave_dphi2 - ave_dphi*ave_dphi;                          
     c = -(sum_detadphi/sum_weight - ave_deta*ave_dphi);                
-  } else ptD_NoQC_ = 0;
+  } else ptD_ = 0;
   float delta = sqrt(fabs((a-b)*(a-b)+4*c*c));
-  if(a+b-delta > 0) axis2_NoQC_ = sqrt(0.5*(a+b-delta));
-  else axis2_NoQC_ = 0.;
+  if(a+b-delta > 0) axis2_ = sqrt(0.5*(a+b-delta));
+  else axis2_ = 0.;
 
-  mult_NoQC_ = (nChg_QC + nNeutral_ptCut);
+  mult_ = (nChg_QC + nNeutral_ptCut);
 }
 
 
@@ -150,12 +171,14 @@ void qgMiniTupleForMiniAOD::beginJob(){
   tree->Branch("rho" ,		&rho, 		"rho/F");
   tree->Branch("pt" ,		&pt,		"pt/F");
   tree->Branch("eta",		&eta,		"eta/F");
-  tree->Branch("axis2_NoQC",	&axis2_NoQC,	"axis2_NoQC/F");
-  tree->Branch("laxis2_NoQC",	&laxis2_NoQC,	"laxis2_NoQC/F");
-  tree->Branch("ptD_NoQC",	&ptD_NoQC,	"ptD_NoQC/F");
-  tree->Branch("mult_NoQC",	&mult_NoQC,	"mult_NoQC/I");
+  tree->Branch("axis2",		&axis2,		"axis2/F");
+  tree->Branch("ptD",		&ptD,		"ptD/F");
+  tree->Branch("mult",		&mult,		"mult/I");
   tree->Branch("bTag",		&bTag,		"bTag/F");
   tree->Branch("partonFlavour",	&partonFlavour,	"partonFlavour/I");
+  tree->Branch("partonId",	&partonId,	"partonId/I");
+  tree->Branch("hasGenJet",	&hasGenJet,	"hasGenJet/O");
+  tree->Branch("matchedJet",	&matchedJet,	"matchedJet/O");
 }
 
 
@@ -164,7 +187,11 @@ void qgMiniTupleForMiniAOD::fillDescriptions(edm::ConfigurationDescriptions& des
   desc.addUntracked<std::string>("fileName","qgMiniTupleForMiniAOD.root");
   desc.add<edm::InputTag>("rhoInputTag");
   desc.add<edm::InputTag>("jetsInputTag");
+  desc.add<edm::InputTag>("genJetsInputTag");
+  desc.add<edm::InputTag>("genParticlesInputTag");
   desc.addUntracked<double>("minJetPt", 10.);
+  desc.addUntracked<double>("deltaRcut", 0.3);
+  desc.addUntracked<bool>("pythia6", false);
   desc.setUnknown();
   descriptions.addDefault(desc);
 }

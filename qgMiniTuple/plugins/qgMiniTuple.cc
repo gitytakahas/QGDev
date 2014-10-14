@@ -44,7 +44,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void beginJob() override;
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       bool jetId(const reco::PFJet *jet, bool tight = false, bool medium = false);
-      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC, bool qualityCuts = true);
+      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC);
       virtual void endJob() override {};
 
       edm::EDGetTokenT<double> rhoToken;
@@ -66,8 +66,8 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      float rho, pt, eta, axis2, axis2_NoQC, ptD, ptD_NoQC, bTag;
-      int nRun, nLumi, nEvent, mult, mult_NoQC, partonId, partonFlavour, jetIdLevel;
+      float rho, pt, eta, axis2, ptD, bTag;
+      int nRun, nLumi, nEvent, mult, partonId, partonFlavour, jetIdLevel;
       bool hasGenJet, matchedJet;
 };
 
@@ -127,8 +127,8 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     float deltaRmin = 999;
     auto matchedGenParticle = genParticles->end();
     for(auto genParticle = genParticles->begin(); genParticle != genParticles->end(); ++genParticle){
-      if(genParticle->status() != (pythia6? 3 : 23)) continue; 						//status 3 (pythia6) / status 23 (pythia8) for outgoing particles from the hardest subprocess
-      if(abs(genParticle->pdgId()) > 5 && abs(genParticle->pdgId()) != 21) continue;			//Only keep quarks and gluons
+      if(genParticle->status() != (pythia6? 3 : 23)) continue; 							//status 3 (pythia6) / status 23 (pythia8) for outgoing particles from the hardest subprocess
+      if(abs(genParticle->pdgId()) > 5 && abs(genParticle->pdgId()) != 21) continue;				//Only keep quarks and gluons
       float thisDeltaR = reco::deltaR(genParticle->eta(), genParticle->phi(), jet->eta(), jet->phi());
       if(thisDeltaR < deltaRmin){
         deltaRmin = thisDeltaR;
@@ -151,9 +151,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     partonFlavour	= (*jetFlavours)[jetRef].getPartonFlavour();
 
     calcVariables(&*jet, axis2, ptD, mult, vertexCollection);
-    calcVariables(&*jet, axis2_NoQC, ptD_NoQC, mult_NoQC, vertexCollection, false);
     axis2 		= -std::log(axis2);
-    axis2_NoQC 		= -std::log(axis2_NoQC);
   
     tree->Fill();
   }
@@ -171,9 +169,6 @@ void qgMiniTuple::beginJob(){
   tree->Branch("axis2",		&axis2,		"axis2/F");
   tree->Branch("ptD",		&ptD,		"ptD/F");
   tree->Branch("mult",		&mult,		"mult/I");
-  tree->Branch("axis2_NoQC",	&axis2_NoQC,	"axis2_NoQC/F");
-  tree->Branch("ptD_NoQC",	&ptD_NoQC,	"ptD_NoQC/F");
-  tree->Branch("mult_NoQC",	&mult_NoQC,	"mult_NoQC/I");
   tree->Branch("bTag",		&bTag,		"bTag/F");
   tree->Branch("partonId",	&partonId,	"partonId/I");
   tree->Branch("partonFlavour",	&partonFlavour,	"partonFlavour/I");
@@ -184,7 +179,7 @@ void qgMiniTuple::beginJob(){
 
 
 /// Calculation of axis2, mult and ptD
-template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC, bool qualityCuts){
+template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC){
   auto vtxLead = vC->begin();
 
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
@@ -200,24 +195,9 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
       for(auto vtx = vC->begin(); vtx != vC->end(); ++vtx){
         if(fabs(itrk->dz(vtx->position())) < fabs(itrk->dz(vtxClose->position()))) vtxClose = vtx;
       }
-
-      if(vtxClose == vtxLead){
-        if(qualityCuts){
-          float dz = itrk->dz(vtxClose->position());
-          float dz_sigma = sqrt(pow(itrk->dzError(),2) + pow(vtxClose->zError(),2));
-
-          if(itrk->quality(reco::TrackBase::qualityByName("highPurity")) && fabs(dz/dz_sigma) < 5.){
-            float d0 = itrk->dxy(vtxClose->position());
-            float d0_sigma = sqrt(pow(itrk->d0Error(),2) + pow(vtxClose->xError(),2) + pow(vtxClose->yError(),2));
-            if(fabs(d0/d0_sigma) < 5.) nChg_QC++;
-          } else continue;
-        } else if(itrk->quality(reco::TrackBase::qualityByName("highPurity"))) nChg_QC++;
-        else continue;
-      } else continue;
-
-    } else {
-      if(part->pt() > 1.0) nNeutral_ptCut++;
-    }
+      if(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity"))) nChg_QC++;
+      else continue;
+    } else if(part->pt() > 1.0) nNeutral_ptCut++;
 
     float deta = part->eta() - jet->eta();
     float dphi = reco::deltaPhi(part->phi(), jet->phi());
@@ -281,10 +261,13 @@ void qgMiniTuple::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
   desc.add<edm::InputTag>("vertexInputTag");
   desc.add<edm::InputTag>("jetsInputTag");
   desc.add<edm::InputTag>("genJetsInputTag");
+  desc.add<edm::InputTag>("genParticlesInputTag");
   desc.add<std::string>("jec");
   desc.add<edm::InputTag>("jetFlavourInputTag");
 //desc.add<edm::InputTag>("qgVariablesInputTag");
   desc.addUntracked<double>("minJetPt", 10.);
+  desc.addUntracked<double>("deltaRcut", 0.3);
+  desc.addUntracked<bool>("pythia6", false);
   desc.setUnknown();
   descriptions.addDefault(desc);
 }

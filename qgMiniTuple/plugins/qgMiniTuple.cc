@@ -67,8 +67,8 @@ class qgMiniTuple : public edm::EDAnalyzer{
       TTree *tree;
 
       float rho, pt, eta, axis2, ptD, bTag;
-      int nRun, nLumi, nEvent, mult, partonId, partonFlavour, jetIdLevel;
-      bool hasGenJet, matchedJet;
+      int nRun, nLumi, nEvent, mult, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
+      bool matchedJet, balanced;
 };
 
 
@@ -114,13 +114,24 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
   rho = (float) *rhoHandle;
   JEC = JetCorrector::getJetCorrector(jecService, iSetup);
 
+  if(jets->size() > 2){
+    auto jet1 = jets->begin();
+    auto jet2 = jets->begin() + 1;
+    auto jet3 = jets->begin() + 2;
+    float pt1 = jet1->pt()*JEC->correction(*jet1, iEvent, iSetup);
+    float pt2 = jet2->pt()*JEC->correction(*jet2, iEvent, iSetup);
+    float pt3 = jet3->pt()*JEC->correction(*jet3, iEvent, iSetup);
+    balanced = (pt3 < 0.15*(pt1+pt2));
+  } else balanced = true;
+
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
+    if(jet == jets->begin() + 2) balanced = false;
     if(jet->pt() < minJetPt) continue;
     edm::RefToBase<reco::Jet> jetRef(edm::Ref<reco::PFJetCollection>(jets, (jet - jets->begin())));
 
-    hasGenJet = false; 
-    for(auto genJet = genJets->begin(); genJet != genJets->end() && !hasGenJet; ++genJet){
-      if(reco::deltaR(*jet, *genJet) < deltaRcut) hasGenJet = true;
+    nGenJetsInCone = 0;
+    for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
+      if(reco::deltaR(*jet, *genJet) < deltaRcut) ++nGenJetsInCone;
     }
 
     partonId = 0; matchedJet = false;
@@ -129,7 +140,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     for(auto genParticle = genParticles->begin(); genParticle != genParticles->end(); ++genParticle){
       if(genParticle->status() != (pythia6? 3 : 23)) continue; 							//status 3 (pythia6) / status 23 (pythia8) for outgoing particles from the hardest subprocess
       if(abs(genParticle->pdgId()) > 5 && abs(genParticle->pdgId()) != 21) continue;				//Only keep quarks and gluons
-      float thisDeltaR = reco::deltaR(genParticle->eta(), genParticle->phi(), jet->eta(), jet->phi());
+      float thisDeltaR = reco::deltaR(*genParticle, *jet);
       if(thisDeltaR < deltaRmin){
         deltaRmin = thisDeltaR;
         matchedGenParticle = genParticle;
@@ -138,6 +149,15 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     if(deltaRmin < deltaRcut){
       partonId 		= matchedGenParticle->pdgId();
       matchedJet	= true;
+
+      nJetsForGenParticle = 0;
+      for(auto otherJet = jets->begin(); otherJet != jets->end(); ++otherJet){
+        if(reco::deltaR(*matchedGenParticle, *otherJet) < deltaRcut) ++nJetsForGenParticle;
+      }
+      nGenJetsForGenParticle = 0;
+      for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
+        if(reco::deltaR(*matchedGenParticle, *genJet) < deltaRcut) ++nGenJetsForGenParticle;
+      }
     }
 
     pt			= jet->pt()*JEC->correction(*jet, iEvent, iSetup);
@@ -160,21 +180,24 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
 void qgMiniTuple::beginJob(){
   tree = fs->make<TTree>("qgMiniTuple","qgMiniTuple");
-  tree->Branch("nRun" ,		&nRun, 		"nRun/I");
-  tree->Branch("nLumi" ,	&nLumi, 	"nLumi/I");
-  tree->Branch("nEvent" ,	&nEvent, 	"nEvent/I");
-  tree->Branch("rho" ,		&rho, 		"rho/F");
-  tree->Branch("pt" ,		&pt,		"pt/F");
-  tree->Branch("eta",		&eta,		"eta/F");
-  tree->Branch("axis2",		&axis2,		"axis2/F");
-  tree->Branch("ptD",		&ptD,		"ptD/F");
-  tree->Branch("mult",		&mult,		"mult/I");
-  tree->Branch("bTag",		&bTag,		"bTag/F");
-  tree->Branch("partonId",	&partonId,	"partonId/I");
-  tree->Branch("partonFlavour",	&partonFlavour,	"partonFlavour/I");
-  tree->Branch("jetIdLevel",	&jetIdLevel,	"jetIdLevel/I");
-  tree->Branch("hasGenJet",	&hasGenJet,	"hasGenJet/O");
-  tree->Branch("matchedJet",	&matchedJet,	"matchedJet/O");
+  tree->Branch("nRun" ,			&nRun, 			"nRun/I");
+  tree->Branch("nLumi" ,		&nLumi, 		"nLumi/I");
+  tree->Branch("nEvent" ,		&nEvent, 		"nEvent/I");
+  tree->Branch("rho" ,			&rho, 			"rho/F");
+  tree->Branch("pt" ,			&pt,			"pt/F");
+  tree->Branch("eta",			&eta,			"eta/F");
+  tree->Branch("axis2",			&axis2,			"axis2/F");
+  tree->Branch("ptD",			&ptD,			"ptD/F");
+  tree->Branch("mult",			&mult,			"mult/I");
+  tree->Branch("bTag",			&bTag,			"bTag/F");
+  tree->Branch("partonId",		&partonId,		"partonId/I");
+  tree->Branch("partonFlavour",		&partonFlavour,		"partonFlavour/I");
+  tree->Branch("jetIdLevel",		&jetIdLevel,		"jetIdLevel/I");
+  tree->Branch("nGenJetsInCone",	&nGenJetsInCone,	"nGenJetsInCone/I");
+  tree->Branch("matchedJet",		&matchedJet,		"matchedJet/O");
+  tree->Branch("balanced",		&balanced,		"balanced/O");
+  tree->Branch("nGenJetsForGenParticle",&nGenJetsForGenParticle,"nGenJetsForGenParticle/I");
+  tree->Branch("nJetsForGenParticle",   &nJetsForGenParticle,   "nJetsForGenParticle/I");
 }
 
 

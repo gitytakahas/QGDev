@@ -114,14 +114,11 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
   rho = (float) *rhoHandle;
   JEC = JetCorrector::getJetCorrector(jecService, iSetup);
 
-  if(jets->size() > 2){
-    auto jet1 = jets->begin();
-    auto jet2 = jets->begin() + 1;
-    auto jet3 = jets->begin() + 2;
-    float pt1 = jet1->pt()*JEC->correction(*jet1, iEvent, iSetup);
-    float pt2 = jet2->pt()*JEC->correction(*jet2, iEvent, iSetup);
-    float pt3 = jet3->pt()*JEC->correction(*jet3, iEvent, iSetup);
-    balanced = (pt3 < 0.15*(pt1+pt2));
+  if(genJets->size() > 2){
+    auto jet1 = genJets->begin();
+    auto jet2 = genJets->begin() + 1;
+    auto jet3 = genJets->begin() + 2;
+    balanced = (jet3->pt() < 0.15*(jet1->pt()+jet2->pt()));
   } else balanced = true;
 
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){

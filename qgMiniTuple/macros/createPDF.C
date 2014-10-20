@@ -10,13 +10,15 @@
 
 int main(int argc, char**argv){
   bool fineBinning = true;
-  TString qualityCut = "";
+  bool rhoBinning = true;
+  bool useBalanced = true;
 
   // Define binning for pdfs
   std::vector<float> etaBins = {0,2.5,4.7};
   std::vector<float> ptBinsC; getBins(ptBinsC, 20, 20, 2000, true); ptBinsC.push_back(4000);
   std::vector<float> ptBinsF; getBins(ptBinsF, 20, 20, 2000, true); ptBinsF.erase(ptBinsF.end() - 12, ptBinsF.end()); ptBinsF.push_back(4000);
-  std::vector<float> rhoBins; getBins(rhoBins, 40, 0, 40, false); rhoBins.push_back(42); rhoBins.push_back(44); rhoBins.push_back(50);
+  std::vector<float> rhoBins = {0,50};
+  if(rhoBinning) rhoBins = {0,5,10,20,50};
 
   printBins("eta", etaBins);
   printBins("pt (central)", ptBinsC);
@@ -30,23 +32,26 @@ int main(int argc, char**argv){
     treePath.ReplaceAll("_antib","");
 
     // Init qgMiniTuple
-    TFile *qgMiniTupleFile = new TFile("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_AllPU.root");
+    TFile *qgMiniTupleFile = new TFile(TString("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_") + (rhoBinning ? "AllPU" : "S14") + ".root");
     TTree *qgMiniTuple; qgMiniTupleFile->GetObject(treePath, qgMiniTuple);
     float rho, pt, eta, axis2, ptD, bTag; 
-    int event, mult, partonId, jetIdLevel;
-    bool hasGenJet, matchedJet;
-    qgMiniTuple->SetBranchAddress("rho", 		&rho);
-    qgMiniTuple->SetBranchAddress("nEvent", 		&event);
-    qgMiniTuple->SetBranchAddress("pt", 		&pt);
-    qgMiniTuple->SetBranchAddress("eta",	 	&eta);
-    qgMiniTuple->SetBranchAddress("axis2"+qualityCut, 	&axis2);
-    qgMiniTuple->SetBranchAddress("ptD"+qualityCut, 	&ptD);
-    qgMiniTuple->SetBranchAddress("mult"+qualityCut, 	&mult);
-    qgMiniTuple->SetBranchAddress("bTag", 		&bTag);
-    qgMiniTuple->SetBranchAddress("partonId", 		&partonId);
-    qgMiniTuple->SetBranchAddress("jetIdLevel",	 	&jetIdLevel);
-    qgMiniTuple->SetBranchAddress("hasGenJet",	 	&hasGenJet);
-    qgMiniTuple->SetBranchAddress("matchedJet",	 	&matchedJet);
+    int event, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle;
+    bool balanced, matchedJet;
+    qgMiniTuple->SetBranchAddress("rho", 			&rho);
+    qgMiniTuple->SetBranchAddress("nEvent", 			&event);
+    qgMiniTuple->SetBranchAddress("pt", 			&pt);
+    qgMiniTuple->SetBranchAddress("eta",	 		&eta);
+    qgMiniTuple->SetBranchAddress("axis2", 			&axis2);
+    qgMiniTuple->SetBranchAddress("ptD",	 		&ptD);
+    qgMiniTuple->SetBranchAddress("mult",	 		&mult);
+    qgMiniTuple->SetBranchAddress("bTag", 			&bTag);
+    qgMiniTuple->SetBranchAddress("partonId", 			&partonId);
+    qgMiniTuple->SetBranchAddress("jetIdLevel",	 		&jetIdLevel);
+    qgMiniTuple->SetBranchAddress("balanced",			&balanced);
+    qgMiniTuple->SetBranchAddress("matchedJet",			&matchedJet);
+    qgMiniTuple->SetBranchAddress("nGenJetsInCone",		&nGenJetsInCone);
+    qgMiniTuple->SetBranchAddress("nGenJetsForGenParticle",	&nGenJetsForGenParticle);
+    qgMiniTuple->SetBranchAddress("nJetsForGenParticle",	&nJetsForGenParticle);
 
     // Creation of the pdfs
     std::map<TString, TH1F*> pdfs;
@@ -54,7 +59,7 @@ int main(int argc, char**argv){
       for(int ptBin = 0; ptBin < getNBins(etaBin == 0? ptBinsC : ptBinsF); ++ptBin){
         for(int rhoBin = 0; rhoBin < getNBins(rhoBins); ++rhoBin){
           for(TString type : {"quark","gluon"}){
-            TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
+            TString histName = "_" + type + TString::Format("_eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
             pdfs["axis2" + histName] = new TH1F("axis2" + histName, "axis2" + histName, fineBinning ? 1000 : 200, 0, 8);
             pdfs["ptD"   + histName] = new TH1F("ptD"   + histName, "ptD"   + histName, fineBinning ? 1000 : 200, 0, 1);
             pdfs["mult"  + histName] = new TH1F("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
@@ -83,14 +88,16 @@ int main(int argc, char**argv){
       if(skipEvent) continue;
 
       if(jetIdLevel < 3) continue;											// Select tight jets
-      if(!hasGenJet || !matchedJet) continue;										// Use only jets matched to gen jet and gen particle
+      if(!matchedJet || nGenJetsInCone != 1 || nJetsForGenParticle != 1 || nGenJetsForGenParticle != 1) continue;	// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
+      if(useBalanced && !balanced) continue;
       if((fabs(partonId) > 3 && partonId != 21) || partonId == 0) continue;						// Keep only udsg
-      if(jetType.Contains("antib") && bTag >  0.405) continue;								// Anti-b tagging
+      if(jetType.Contains("antib") && bTag >  0.244) continue;								// Anti-b tagging
       if(fabs(eta) > 2 && fabs(eta) < 3) continue;									// Don't use 2 < |eta| < 3
 
       TString type = (partonId == 21? "gluon" : "quark");								// Define q/g
 
-      TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
+      TString histName = "_" + type + TString::Format("_eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
+
       pdfs["axis2" + histName]->Fill(axis2);										// "axis2" already contains the log
       pdfs["ptD"   + histName]->Fill(ptD);
       pdfs["mult"  + histName]->Fill(mult);
@@ -99,7 +106,7 @@ int main(int argc, char**argv){
     std::cout << countDoubles << " doubles on a total of " << qgMiniTuple->GetEntries() << std::endl;
 
     // Write pdfs and binning to file
-    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + qualityCut + "_13TeV.root","RECREATE");
+    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + (rhoBinning ? "_rhoBinning":"") + (useBalanced ? "_balanced" : "") + "_13TeV.root","RECREATE");
     pdfFile->cd();
     writeBinsToFile(etaBins, "etaBins");
     writeBinsToFile(ptBinsC, "ptBinsC");

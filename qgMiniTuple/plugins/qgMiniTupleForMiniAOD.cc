@@ -50,8 +50,8 @@ class qgMiniTupleForMiniAOD : public edm::EDAnalyzer{
       TTree *tree;
 
       float rho, pt, eta, axis2, ptD, bTag;
-      int nRun, nLumi, nEvent, mult, partonFlavour, partonId;
-      bool hasGenJet, matchedJet;
+      int nRun, nLumi, nEvent, mult, partonId, partonFlavour, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
+      bool matchedJet, balanced;
 };
 
 
@@ -78,12 +78,22 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
   edm::Handle<reco::GenParticleCollection> genParticles;		iEvent.getByToken(genParticlesToken, 	genParticles);
 
   rho = (float) *rhoHandle;
+
+  if(jets->size() > 2){
+    auto jet1 = genJets->begin();
+    auto jet2 = genJets->begin() + 1;
+    auto jet3 = genJets->begin() + 2;
+    balanced = (jet3->pt() < 0.15*(jet1->pt()+jet2->pt()));
+  } else balanced = true;
+
+
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
+    if(jet == jets->begin() + 2) balanced = false;
     if(jet->pt() < minJetPt) continue;
 
-    hasGenJet = false;
-    for(auto genJet = genJets->begin(); genJet != genJets->end() && !hasGenJet; ++genJet){
-      if(reco::deltaR(*jet, *genJet) < deltaRcut) hasGenJet = true;
+    nGenJetsInCone = 0;
+    for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
+      if(reco::deltaR(*jet, *genJet) < deltaRcut) ++nGenJetsInCone;
     }
 
     partonId = 0; matchedJet = false;
@@ -101,6 +111,15 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
     if(deltaRmin < deltaRcut){
       partonId 		= matchedGenParticle->pdgId();
       matchedJet	= true;
+
+      nJetsForGenParticle = 0;
+      for(auto otherJet = jets->begin(); otherJet != jets->end(); ++otherJet){
+        if(reco::deltaR(*matchedGenParticle, *otherJet) < deltaRcut) ++nJetsForGenParticle;
+      }
+      nGenJetsForGenParticle = 0;
+      for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
+        if(reco::deltaR(*matchedGenParticle, *genJet) < deltaRcut) ++nGenJetsForGenParticle;
+      }
     }
 
     calcVariables(&*jet, axis2, ptD, mult);
@@ -165,20 +184,23 @@ template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetCla
 
 void qgMiniTupleForMiniAOD::beginJob(){
   tree = fs->make<TTree>("qgMiniTupleForMiniAOD","qgMiniTuple");
-  tree->Branch("nRun" ,		&nRun, 		"nRun/I");
-  tree->Branch("nLumi" ,	&nLumi, 	"nLumi/I");
-  tree->Branch("nEvent" ,	&nEvent, 	"nEvent/I");
-  tree->Branch("rho" ,		&rho, 		"rho/F");
-  tree->Branch("pt" ,		&pt,		"pt/F");
-  tree->Branch("eta",		&eta,		"eta/F");
-  tree->Branch("axis2",		&axis2,		"axis2/F");
-  tree->Branch("ptD",		&ptD,		"ptD/F");
-  tree->Branch("mult",		&mult,		"mult/I");
-  tree->Branch("bTag",		&bTag,		"bTag/F");
-  tree->Branch("partonFlavour",	&partonFlavour,	"partonFlavour/I");
-  tree->Branch("partonId",	&partonId,	"partonId/I");
-  tree->Branch("hasGenJet",	&hasGenJet,	"hasGenJet/O");
-  tree->Branch("matchedJet",	&matchedJet,	"matchedJet/O");
+  tree->Branch("nRun" ,			&nRun, 			"nRun/I");
+  tree->Branch("nLumi" ,		&nLumi, 		"nLumi/I");
+  tree->Branch("nEvent" ,		&nEvent, 		"nEvent/I");
+  tree->Branch("rho" ,			&rho, 			"rho/F");
+  tree->Branch("pt" ,			&pt,			"pt/F");
+  tree->Branch("eta",			&eta,			"eta/F");
+  tree->Branch("axis2",			&axis2,			"axis2/F");
+  tree->Branch("ptD",			&ptD,			"ptD/F");
+  tree->Branch("mult",			&mult,			"mult/I");
+  tree->Branch("bTag",			&bTag,			"bTag/F");
+  tree->Branch("partonId",		&partonId,		"partonId/I");
+  tree->Branch("partonFlavour",		&partonFlavour,		"partonFlavour/I");
+  tree->Branch("nGenJetsInCone",	&nGenJetsInCone,	"nGenJetsInCone/I");
+  tree->Branch("matchedJet",		&matchedJet,		"matchedJet/O");
+  tree->Branch("balanced",		&balanced,		"balanced/O");
+  tree->Branch("nGenJetsForGenParticle",&nGenJetsForGenParticle,"nGenJetsForGenParticle/I");
+  tree->Branch("nJetsForGenParticle",   &nJetsForGenParticle,   "nJetsForGenParticle/I");
 }
 
 

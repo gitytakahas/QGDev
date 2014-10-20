@@ -144,7 +144,7 @@ int main(int argc, char**argv){
             else if(type == "_c")  	roc[var+type]->SetLineColor(var == "qg2" ? 3 : (var == "qg"? kBlack : (var == "axis2"? kYellow : (var == "ptD"? kAzure+10 : kOrange))));
             else		 	roc[var+type]->SetLineColor(var == "axis2"? kGreen+4 : (var == "ptD"? kMagenta+4 : kRed));
 	    roc[var+type]->SetLineWidth(type == "_l" ? 3 : 1);
-            roc[var+type]->SetLineWidth(type == "" ? 3 : 1);
+            roc[var+type]->SetLineStyle(type == "" ? 3 : 1);
 
             TString entryName = "quark-gluon";
             if(var == "axis2") 	entryName = "-log(#sigma_{2})";

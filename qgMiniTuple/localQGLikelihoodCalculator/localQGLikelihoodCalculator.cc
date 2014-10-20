@@ -156,7 +156,7 @@ TH1F* QGLikelihoodCalculator::findEntry(float eta, float pt, float rho, int qgIn
   if(!getBinNumber(etaBins, fabs(eta), etaBin)) 			return nullptr;
   if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt, ptBin)) 		return nullptr;
   if(!getBinNumber(rhoBins, rho, rhoBin)) 				return nullptr;
-  TString histName = (varIndex == 2 ? "axis2" : (varIndex? "ptD" : "mult")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
+  TString histName = (varIndex == 2 ? "axis2" : (varIndex? "ptD" : "mult")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString::Format("_eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
   return pdfs[histName];
 }
 

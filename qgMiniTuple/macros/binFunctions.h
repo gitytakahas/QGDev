@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include "TVector.h"
 
 void getBins(std::vector<float>& bins, int nBins, double min, double max, bool log){
@@ -61,5 +62,16 @@ bool eventAlreadyInRhoBin(std::map<int, std::map<int, std::map<int, std::vector<
   else if(std::find((*myVector)->begin(), (*myVector)->end(), event) != (*myVector)->end()) return true;
   (*myVector)->push_back(event);
   return false;
+}
+
+
+// Construct latex loop containing \bin, \ptMin and \ptMax variables
+void makeTexLoop(std::vector<float> bins, TString outputTextFile){
+  ofstream output;
+  output.open(outputTextFile.Data());
+  output << "\\foreach \\bin in {0,...," << bins.size() - 2 << "}{" << std::endl;
+  for(int i = 0; i < bins.size() - 1; ++i) output << "  \\ifthenelse{\\equal{\\bin}{" << i << "}}{\\def\\ptMin{" << bins[i] << "}\\def\\ptMax{" << bins[i+1] << "}}{}" << std::endl;
+  output << "}" << std::endl;
+  output.close();
 }
 #endif

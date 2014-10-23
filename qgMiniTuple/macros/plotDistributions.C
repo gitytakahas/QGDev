@@ -29,6 +29,7 @@ int main(int argc, char**argv){
 
   // To be used in case of file == QCD_AllPtBins:
   std::vector<TString> ptHatBins = {"15to30","30to50","50to80","80to120","120to170","170to300","300to470","470to600","600to800","800to1000","1000to1400","1400to1800","1800to2400", "2400to3200","3200"};
+  std::vector<int>     ptHatMin  = { 15,      30,      50,      80,       120,       170,       300,       470,       600,       800,        1000,        1400,        1800,         2400,        3200};
   std::vector<float>   nEvents   = { 2498841, 2449363, 2500315, 2500098,  2491398,   1490834,   1498032,   1498417,   1465278,   1500369,    1500642,     1500040,     2953210 ,     2958105,     2953431};
   std::vector<float>   xsec      = { 2237e6,  1615e5,  2211e4,  3000114,  493200,    120300,    7475,      587.1,     167,       28.25,      8.195,       0.7346,      0.102,        0.00644,     0.000163};
 
@@ -127,10 +128,13 @@ int main(int argc, char**argv){
         else 					type = "undefined";
 
         double weight;
-        if(file == "QCD_AllPtBins"){
+        if(file == "QCD_AllPtBins"){												// Try to avoid high weights from jets with  pT >>> ptHat
+          int ptIndex = 0;
+          while(pt > ptHatMin[ptIndex]) ++ptIndex;
           int treeIndex = qgMiniTuple->GetTreeNumber();
-          weight = xsec[treeIndex]/nEvents[treeIndex];
-        } else weight = 1.;
+          if(pt < 10*ptHatMin[treeIndex]) weight = xsec[treeIndex]/nEvents[treeIndex];
+          else	                          weight = xsec[ptIndex]/nEvents[ptIndex];
+        } else 		                  weight = 1.;
 
         TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
         plots["axis2"   + histName]->Fill(axis2, 									weight);

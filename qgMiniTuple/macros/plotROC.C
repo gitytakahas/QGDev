@@ -2,12 +2,11 @@
 #include <stdlib.h>
 #include <vector>
 #include <map>
-#include <string>
 #include <iostream>
-#include "TMath.h"
 #include "TTree.h"
+#include "TChain.h"
 #include "TFile.h"
-#include "TH1F.h"
+#include "TH1D.h"
 #include "TGraph.h"
 #include "TCanvas.h"
 #include "TLegend.h"
@@ -19,34 +18,46 @@
 
 
 int main(int argc, char**argv){
+  TString qgMiniTuplesDir 	= "~tomc/public/merged/QGMiniTuple/"; // On T2B
+  std::vector<TString> files	= {"QCD_AllPtBins"};
+  std::vector<TString> jetTypes = {"AK4chs"};
+
+  // To be used in case of file == QCD_AllPtBins:
+  std::vector<TString> ptHatBins = {"15to30","30to50","50to80","80to120","120to170","170to300","300to470","470to600","600to800","800to1000","1000to1400","1400to1800","1800to2400", "2400to3200","3200"};
+  std::vector<int> ptHatMin      = { 15,      30,      50,      80,       120,       170,       300,       470,       600,       800,        1000,        1400,        1800,         2400,        3200};
+  std::vector<float>   nEvents   = { 2498841, 2449363, 2500315, 2500098,  2491398,   1490834,   1498032,   1498417,   1465278,   1500369,    1500642,     1500040,     2953210 ,     2958105,     2953431};
+  std::vector<float>   xsec      = { 2237e6,  1615e5,  2211e4,  3000114,  493200,    120300,    7475,      587.1,     167,       28.25,      8.195,       0.7346,      0.102,        0.00644,     0.000163};
+
   // Define binning for plots
   std::vector<float> etaBins = {0,2.5,4.7};
-  std::vector<float> ptBinsC; getBins(ptBinsC, 20, 20, 2000, true); ptBinsC.push_back(4000);
-  std::vector<float> ptBinsF; getBins(ptBinsF, 20, 20, 2000, true); ptBinsF.erase(ptBinsF.end() - 12, ptBinsF.end()); ptBinsF.push_back(4000);
-  std::vector<float> rhoBins = {0,50};
+  std::vector<float> ptBinsC; getBins(ptBinsC, 50, 20, 2500, true); ptBinsC.push_back(6500);
+  std::vector<float> ptBinsF; getBins(ptBinsF, 5, 20, 200, true); ptBinsF.push_back(1000);
+  std::vector<float> rhoBins = {0,9999};
 
   printBins("eta", etaBins);
   printBins("pt (central)", ptBinsC);
   printBins("pt (forward)", ptBinsF);
   printBins("rho", rhoBins); std::cout << std::endl;
+  makeTexLoop(ptBinsC, "ptBinsC.tex");
+  makeTexLoop(ptBinsF, "ptBinsF.tex");
 
-  // For different samples and jet types
-//  for(TString file : {"VBF_HToBB_M-125_13TeV-powheg-pythia6","EWKZjj_mqq120_mll50_13TeV_madgraph-pythia8","QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8"}){
-//  for(TString file : {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"}){
-  for(TString file : {"QCD_AllPtBins"}){
-//    for(TString jetType : {"AK4","AK4chs","AK5","AK5chs"}){
-    for(TString jetType : {"AK4chs"}){
+  // Loop over different samples and jet types
+  for(TString file : files){
+    for(TString jetType : jetTypes){
       std::cout << "Making plots for " << jetType << " in file " << file << "..." << std::endl;
       system("rm -rf plots/ROC/" + file + "/" + jetType);
-      system("mkdir -p plots/ROC/" + file + "/" + jetType);
 
       // Init local QGLikelihoodCalculator
       QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV.root");
       QGLikelihoodCalculator localQG_cdf("../data/pdfQG_" + jetType + "_fineBinning_13TeV.root");
 
       // Init qgMiniTuple
-      TFile *qgMiniTupleFile = new TFile(file == "test" ? "../test/qgMiniTuple.root" : "~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
-      TTree *qgMiniTuple; qgMiniTupleFile->GetObject("qgMiniTuple"+jetType+"/qgMiniTuple",qgMiniTuple);
+      TChain *qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
+      if(file == "QCD_AllPtBins"){
+        for(TString ptHatBin : ptHatBins) 	qgMiniTuple->Add(qgMiniTuplesDir + "/qgMiniTuple_QCD_Pt-"+ ptHatBin +"_Tune4C_13TeV_pythia8.root", -1);
+      } else if(file == "test"){ 		qgMiniTuple->Add("../test/qgMiniTuple.root", -1);
+      } else 					qgMiniTuple->Add(qgMiniTuplesDir + "qgMiniTuple_" + file + ".root", -1);
+
       float rho, pt, eta, axis2, ptD, bTag;
       int event, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle;
       bool balanced, matchedJet;
@@ -93,25 +104,38 @@ int main(int argc, char**argv){
 
         if(jetIdLevel < 3) 		continue;
         if(mult < 3) 			continue; 										//Need at least three particles in the jet
+	if(!balanced) 			continue;										// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
+        if(!matchedJet || nGenJetsInCone != 1 || nJetsForGenParticle != 1 || nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
+        if(fabs(eta) > 2 && fabs(eta) < 3) continue;									// Don't use 2.1 < |eta| < 2.9
+
         TString type;
         if(partonId == 21) 	 			type = "gluon";
         else if(fabs(partonId) < 4 && partonId != 0) 	type = "quark";
         else continue;
 
+        double weight;
+        if(file == "QCD_AllPtBins"){												// Try to avoid high weights from jets with  pT >>> ptHat
+          int ptIndex = 0;
+          while(pt > ptHatMin[ptIndex]) ++ptIndex;
+          int treeIndex = qgMiniTuple->GetTreeNumber();
+          if(pt < 10*ptHatMin[treeIndex]) weight = xsec[treeIndex]/nEvents[treeIndex];
+          else	                          weight = xsec[ptIndex]/nEvents[ptIndex];
+        } else 		                  weight = 1.;
+
         TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
-        plots["axis2"   + histName]->Fill(axis2);
-        plots["ptD"     + histName]->Fill(ptD);
-        plots["mult"    + histName]->Fill(mult);
-        plots["qg_l"    + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult, ptD, axis2}));
-        plots["qg2_l"   + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult, ptD}));
-        plots["axis2_l" + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {-1, -1, axis2}));
-        plots["ptD_l"   + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {-1, ptD}));
-        plots["mult_l"  + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult}));
-        plots["qg_c"    + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult, ptD, axis2}));
-        plots["qg2_c"   + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult, ptD}));
-        plots["axis2_c" + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {-1, -1, axis2}));
-        plots["ptD_c"   + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {-1, ptD}));
-        plots["mult_c"  + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult}));
+        plots["axis2"   + histName]->Fill(axis2, weight);
+        plots["ptD"     + histName]->Fill(ptD, weight);
+        plots["mult"    + histName]->Fill(mult, weight);
+        plots["qg_l"    + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult, ptD, axis2}), weight);
+        plots["qg2_l"   + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult, ptD}), 	weight);
+        plots["axis2_l" + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {-1, -1, axis2}), 		weight);
+        plots["ptD_l"   + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {-1, ptD}), 			weight);
+        plots["mult_l"  + histName]->Fill(localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult}), 		weight);
+        plots["qg_c"    + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult, ptD, axis2}), weight);
+        plots["qg2_c"   + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult, ptD}), 	weight);
+        plots["axis2_c" + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {-1, -1, axis2}), 		weight);
+        plots["ptD_c"   + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {-1, ptD}), 			weight);
+        plots["mult_c"  + histName]->Fill(localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult}), 		weight);
       }
       for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX() + 1));
 
@@ -160,7 +184,7 @@ int main(int argc, char**argv){
               roc[var+type]->GetXaxis()->SetTitle("gluon-jet rejection");
               roc[var+type]->GetXaxis()->SetRangeUser(0,1);
               roc[var+type]->GetYaxis()->SetRangeUser(0,1);
-              roc[var+type]->SetTitle("RoC");
+              roc[var+type]->SetTitle("ROC");
               roc[var+type]->Draw("AL");
             } else roc[var+type]->Draw("l");
           }
@@ -182,15 +206,17 @@ int main(int argc, char**argv){
         t.SetTextAlign(13);
         t.DrawLatex(0.1,0.93,  jetType);
 
-        TString pdfName = "./plots/ROC/" + file + "/" + jetType + "/" + plot.first + ".pdf";
+        TString pdfDir = "./plots/ROC/" + file + "/" + jetType + "/";
+        TString pdfName = pdfDir + plot.first + ".pdf";
         pdfName.ReplaceAll("_gluon","");
         pdfName.ReplaceAll("qg_l","ROC");
+        system("mkdir -p " + pdfDir);
         c.SaveAs(pdfName);
         for(auto& r : roc) delete r.second;
       }
 
       for(auto& plot : plots) delete plot.second;
-      delete qgMiniTupleFile;
+      delete qgMiniTuple;
     }
   }
   return 0;

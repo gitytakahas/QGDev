@@ -51,8 +51,8 @@ int main(int argc, char**argv){
   double multBinsArray[1000];  std::copy(multBins.begin(),  multBins.end(),  multBinsArray);
 
   // For different samples and jet types
-  for(TString file : {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"}){
-    for(TString jetType : {"AK4chs"}){
+  for(TString file : files){
+    for(TString jetType : jetTypes){
       std::cout << "Making plots for " << jetType << " in file " << file << "..." << std::endl;
       system("rm -rf plots/profile2D/" + file + "/" + jetType);
 

@@ -3,7 +3,7 @@
 #include <vector>
 #include <map>
 #include <iostream>
-#include "TTree.h"
+#include "TChain.h"
 #include "TFile.h"
 #include "TH3D.h"
 #include "TProfile2D.h"
@@ -19,6 +19,17 @@
 int main(int argc, char**argv){
   bool norm = true;
   bool extraBinInformation = true;
+
+  TString qgMiniTuplesDir 	= "~tomc/public/merged/QGMiniTuple/"; // On T2B
+  std::vector<TString> files	= {"QCD_AllPtBins"};
+//std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
+  std::vector<TString> jetTypes = {"AK4chs"};
+
+  // To be used in case of file == QCD_AllPtBins:
+  std::vector<TString> ptHatBins = {"15to30","30to50","50to80","80to120","120to170","170to300","300to470","470to600","600to800","800to1000","1000to1400","1400to1800","1800to2400", "2400to3200","3200"};
+  std::vector<int>     ptHatMin  = { 15,      30,      50,      80,       120,       170,       300,       470,       600,       800,        1000,        1400,        1800,         2400,        3200};
+  std::vector<float>   nEvents   = { 2498841, 2449363, 2500315, 2500098,  2491398,   1490834,   1498032,   1498417,   1465278,   1500369,    1500642,     1500040,     2953210 ,     2958105,     2953431};
+  std::vector<float>   xsec      = { 2237e6,  1615e5,  2211e4,  3000114,  493200,    120300,    7475,      587.1,     167,       28.25,      8.195,       0.7346,      0.102,        0.00644,     0.000163};
 
   // Define binning for plots
   std::vector<float> etaBins; getBins(etaBins, 40, 0, 4, false); etaBins.push_back(4.2); etaBins.push_back(4.4); etaBins.push_back(4.7);
@@ -50,8 +61,12 @@ int main(int argc, char**argv){
       QGLikelihoodCalculator localQG_cdf("../data/pdfQG_" + jetType + "_fineBinning_13TeV.root");
 
       // Init qgMiniTuple
-      TFile *qgMiniTupleFile = new TFile("~/public/merged/QGMiniTuple/qgMiniTuple_" + file + ".root");
-      TTree *qgMiniTuple; qgMiniTupleFile->GetObject("qgMiniTuple"+jetType+"/qgMiniTuple",qgMiniTuple);
+      TChain *qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
+      if(file == "QCD_AllPtBins"){
+        for(TString ptHatBin : ptHatBins) 	qgMiniTuple->Add(qgMiniTuplesDir + "/qgMiniTuple_QCD_Pt-"+ ptHatBin +"_Tune4C_13TeV_pythia8.root", -1);
+      } else if(file == "test"){ 		qgMiniTuple->Add("../test/qgMiniTuple.root", -1);
+      } else 					qgMiniTuple->Add(qgMiniTuplesDir + "qgMiniTuple_" + file + ".root", -1);
+
       float rho, pt, eta, axis2, ptD, bTag; 
       int event, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle;
       bool balanced, matchedJet;
@@ -109,18 +124,27 @@ int main(int argc, char**argv){
         else if(fabs(partonId) < 4) 	type = "quark";
         else continue;
 
+        double weight;
+        if(file == "QCD_AllPtBins"){												// Try to avoid high weights from jets with  pT >>> ptHat
+          int ptIndex = 0;
+          while(pt > ptHatMin[ptIndex]) ++ptIndex;
+          int treeIndex = qgMiniTuple->GetTreeNumber();
+          if(pt < 10*ptHatMin[treeIndex]) weight = xsec[treeIndex]/nEvents[treeIndex];
+          else	                          weight = xsec[ptIndex]/nEvents[ptIndex];
+        } else 		                  weight = 1.;
+
         TString histName = "_" + type + TString::Format("_rho-%d", rhoBin);
-        plots["axis2" + histName]->Fill(fabs(eta), pt, axis2);
-        plots["ptD"   + histName]->Fill(fabs(eta), pt, ptD);
-        plots["mult"  + histName]->Fill(fabs(eta), pt, mult);
-        plots["qg"    + histName]->Fill(fabs(eta), pt, localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult, ptD, axis2}));
-        plots["cdf"   + histName]->Fill(fabs(eta), pt, localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult, ptD, axis2}));
+        plots["axis2" + histName]->Fill(fabs(eta), pt, axis2, weight);
+        plots["ptD"   + histName]->Fill(fabs(eta), pt, ptD, weight);
+        plots["mult"  + histName]->Fill(fabs(eta), pt, mult, weight);
+        plots["qg"    + histName]->Fill(fabs(eta), pt, localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult, ptD, axis2}), weight);
+        plots["cdf"   + histName]->Fill(fabs(eta), pt, localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult, ptD, axis2}), weight);
         if(extraBinInformation){
-          plots3D["axis2" + histName]->Fill(fabs(eta), pt, axis2);
-          plots3D["ptD"   + histName]->Fill(fabs(eta), pt, ptD);
-          plots3D["mult"  + histName]->Fill(fabs(eta), pt, mult);
-          plots3D["qg"    + histName]->Fill(fabs(eta), pt, localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult, ptD, axis2}));
-          plots3D["cdf"   + histName]->Fill(fabs(eta), pt, localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult, ptD, axis2}));
+          plots3D["axis2" + histName]->Fill(fabs(eta), pt, axis2, weight);
+          plots3D["ptD"   + histName]->Fill(fabs(eta), pt, ptD, weight);
+          plots3D["mult"  + histName]->Fill(fabs(eta), pt, mult, weight);
+          plots3D["qg"    + histName]->Fill(fabs(eta), pt, localQG.computeQGLikelihood(       pt, eta, rho, {(float) mult, ptD, axis2}), weight);
+          plots3D["cdf"   + histName]->Fill(fabs(eta), pt, localQG_cdf.computeQGLikelihoodCDF(pt, eta, rho, {(float) mult, ptD, axis2}), weight);
         }
       }
 
@@ -168,7 +192,7 @@ int main(int argc, char**argv){
             }
           }
           kurtosisInBin->SetTitle(TString(plot.second->GetTitle()).ReplaceAll("mean","kurtosis"));
-          kurtosisInBin->SetTitle(TString(plot.second->GetTitle()).ReplaceAll("mean","skewness"));
+          skewnessInBin->SetTitle(TString(plot.second->GetTitle()).ReplaceAll("mean","skewness"));
 
           kurtosisInBin->Draw("COLZ");
           c.Modified();
@@ -201,7 +225,8 @@ int main(int argc, char**argv){
       }
 
       for(auto& plot : plots) delete plot.second;
-      delete qgMiniTupleFile;
+      for(auto& plot : plots3D) delete plot.second;
+      delete qgMiniTuple;
     }
   }
   return 0;

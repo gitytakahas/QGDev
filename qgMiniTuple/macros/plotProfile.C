@@ -129,9 +129,9 @@ int main(int argc, char**argv){
           int ptIndex = 0;
           while(pt > ptHatMin[ptIndex]) ++ptIndex;
           int treeIndex = qgMiniTuple->GetTreeNumber();
-          if(pt < 10*ptHatMin[treeIndex]) weight = xsec[treeIndex]/nEvents[treeIndex];
-          else	                          weight = xsec[ptIndex]/nEvents[ptIndex];
-        } else 		                  weight = 1.;
+          if(pt < 6*ptHatMin[treeIndex]) weight = xsec[treeIndex]/nEvents[treeIndex];
+          else	                         weight = xsec[ptIndex]/nEvents[ptIndex];
+        } else 		                 weight = 1.;
 
         TString histName = "_" + type + TString::Format("_rho-%d", rhoBin);
         plots["axis2" + histName]->Fill(fabs(eta), pt, axis2, weight);
@@ -181,13 +181,13 @@ int main(int argc, char**argv){
 
           TH2D* kurtosisInBin = (TH2D*) rmsInBin->Clone("kurtosis" + plot.first);
           TH2D* skewnessInBin = (TH2D*) rmsInBin->Clone("skewness" + plot.first);
+          kurtosisInBin->Reset();
+          skewnessInBin->Reset();
           for(int i = 1; i < getNBins(etaBins) + 1; ++i){
             for(int j = 1; j < getNBins(ptBins) + 1; ++j){
               TH1D *temp = plots3D[plot.first]->ProjectionZ("", i, i, j, j);
-              if(temp->GetEntries() != 0){
-                kurtosisInBin->SetBinContent(i, j, temp->GetKurtosis());
-                skewnessInBin->SetBinContent(i, j, temp->GetSkewness());
-              }
+              if(temp->GetEntries() != 0 && temp->GetKurtosis() < 10) kurtosisInBin->SetBinContent(i, j, temp->GetKurtosis());
+              if(temp->GetEntries() != 0 && temp->GetSkewness() < 10) skewnessInBin->SetBinContent(i, j, temp->GetSkewness());
               delete temp;
             }
           }

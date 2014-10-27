@@ -44,7 +44,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void beginJob() override;
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       bool jetId(const reco::PFJet *jet, bool tight = false, bool medium = false);
-      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC);
+      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC, bool ptCut = false);
       virtual void endJob() override {};
 
       edm::EDGetTokenT<double> rhoToken;
@@ -66,7 +66,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      float rho, pt, eta, axis2, ptD, bTag;
+      float rho, pt, eta, axis2, ptD, bTag, axis2_ptCut, ptD_ptCut;
       int nRun, nLumi, nEvent, mult, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
       bool matchedJet, balanced;
 };
@@ -167,6 +167,8 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     jetIdLevel		= jetId(&*jet) + jetId(&*jet, false, true) + jetId(&*jet, true); 
     partonFlavour	= (*jetFlavours)[jetRef].getPartonFlavour();
 
+    calcVariables(&*jet, axis2_ptCut, ptD_ptCut, mult, vertexCollection, true);
+    axis2_ptCut		= -std::log(axis2_ptCut);
     calcVariables(&*jet, axis2, ptD, mult, vertexCollection);
     axis2 		= -std::log(axis2);
   
@@ -186,6 +188,8 @@ void qgMiniTuple::beginJob(){
   tree->Branch("axis2",			&axis2,			"axis2/F");
   tree->Branch("ptD",			&ptD,			"ptD/F");
   tree->Branch("mult",			&mult,			"mult/I");
+  tree->Branch("axis2_ptCut",		&axis2_ptCut,		"axis2_ptCut/F");
+  tree->Branch("ptD_ptCut",		&ptD_ptCut,		"ptD_ptCut/F");
   tree->Branch("bTag",			&bTag,			"bTag/F");
   tree->Branch("partonId",		&partonId,		"partonId/I");
   tree->Branch("partonFlavour",		&partonFlavour,		"partonFlavour/I");
@@ -199,7 +203,7 @@ void qgMiniTuple::beginJob(){
 
 
 /// Calculation of axis2, mult and ptD
-template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC){
+template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC, bool ptCut){
   auto vtxLead = vC->begin();
 
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
@@ -217,7 +221,10 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
       }
       if(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity"))) nChg_QC++;
       else continue;
-    } else if(part->pt() > 1.0) nNeutral_ptCut++;
+    } else {
+      if(part->pt() > 1.0) nNeutral_ptCut++;
+      else if(ptCut) continue;
+    }
 
     float deta = part->eta() - jet->eta();
     float dphi = reco::deltaPhi(part->phi(), jet->phi());

@@ -24,7 +24,7 @@ class QGLikelihoodCalculator{
     bool isValidRange(float pt, float rho, float eta);
     bool getBinNumber(std::vector<float>& bins, float value, int& bin);
 
-    std::vector<float> etaBins, ptBinsC, ptBinsF, rhoBins;
+    std::vector<float> etaBins, ptBins, rhoBins;
     std::map<TString, TH1F*> pdfs; 
     TFile* f;
 };

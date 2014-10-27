@@ -26,8 +26,7 @@ bool QGLikelihoodCalculator::init(const TString& fileName){
   f = new TFile(fileName);
   if(f->IsZombie()) 				return false;
   if(!(this->getBinsFromFile(etaBins, "etaBins")))	return false;
-  if(!(this->getBinsFromFile(ptBinsC, "ptBinsC")))	return false;
-  if(!(this->getBinsFromFile(ptBinsF, "ptBinsF")))	return false;
+  if(!(this->getBinsFromFile(ptBins,  "ptBins")))	return false;
   if(!(this->getBinsFromFile(rhoBins, "rhoBins")))	return false;
 
   TList *keys = f->GetListOfKeys();
@@ -153,9 +152,9 @@ float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float 
 /// Find matching entry for a given eta, pt, rho, qgIndex and varIndex
 TH1F* QGLikelihoodCalculator::findEntry(float eta, float pt, float rho, int qgIndex, int varIndex){
   int etaBin, ptBin, rhoBin;
-  if(!getBinNumber(etaBins, fabs(eta), etaBin)) 			return nullptr;
-  if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt, ptBin)) 		return nullptr;
-  if(!getBinNumber(rhoBins, rho, rhoBin)) 				return nullptr;
+  if(!getBinNumber(etaBins, fabs(eta), etaBin)) return nullptr;
+  if(!getBinNumber(ptBins, pt, ptBin)) 		return nullptr;
+  if(!getBinNumber(rhoBins, rho, rhoBin)) 	return nullptr;
   TString histName = (varIndex == 2 ? "axis2" : (varIndex? "ptD" : "mult")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString::Format("_eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
   return pdfs[histName];
 }
@@ -163,8 +162,8 @@ TH1F* QGLikelihoodCalculator::findEntry(float eta, float pt, float rho, int qgIn
 
 /// Check the valid range of this qg tagger, using the bin vectors
 bool QGLikelihoodCalculator::isValidRange(float pt, float rho, float eta){
-  if(pt < ptBinsC.front()) 		return false;
-  if(pt > ptBinsC.back()) 		return false;
+  if(pt < ptBins.front()) 		return false;
+  if(pt > ptBins.back()) 		return false;
   if(rho < rhoBins.front()) 		return false;
   if(rho > rhoBins.back()) 		return false;
   if(fabs(eta) < etaBins.front()) 	return false;

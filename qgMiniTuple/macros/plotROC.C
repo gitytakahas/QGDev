@@ -24,22 +24,19 @@ int main(int argc, char**argv){
 
   // To be used in case of file == QCD_AllPtBins:
   std::vector<TString> ptHatBins = {"15to30","30to50","50to80","80to120","120to170","170to300","300to470","470to600","600to800","800to1000","1000to1400","1400to1800","1800to2400", "2400to3200","3200"};
-  std::vector<int> ptHatMin      = { 15,      30,      50,      80,       120,       170,       300,       470,       600,       800,        1000,        1400,        1800,         2400,        3200};
+  std::vector<int>     ptHatMin  = { 15,      30,      50,      80,       120,       170,       300,       470,       600,       800,        1000,        1400,        1800,         2400,        3200};
   std::vector<float>   nEvents   = { 2498841, 2449363, 2500315, 2500098,  2491398,   1490834,   1498032,   1498417,   1465278,   1500369,    1500642,     1500040,     2953210 ,     2958105,     2953431};
   std::vector<float>   xsec      = { 2237e6,  1615e5,  2211e4,  3000114,  493200,    120300,    7475,      587.1,     167,       28.25,      8.195,       0.7346,      0.102,        0.00644,     0.000163};
 
   // Define binning for plots
-  std::vector<float> etaBins = {0,2.5,4.7};
-  std::vector<float> ptBinsC; getBins(ptBinsC, 50, 20, 2500, true); ptBinsC.push_back(6500);
-  std::vector<float> ptBinsF; getBins(ptBinsF, 5, 20, 200, true); ptBinsF.push_back(1000);
+  std::vector<float> etaBins = {0,1.3,1.5,2,2.5,3,4.7};
+  std::vector<float> ptBins; getBins(ptBins, 20, 20, 2000, true); ptBins.push_back(6500);
   std::vector<float> rhoBins = {0,9999};
 
   printBins("eta", etaBins);
-  printBins("pt (central)", ptBinsC);
-  printBins("pt (forward)", ptBinsF);
+  printBins("pt", ptBins);
   printBins("rho", rhoBins); std::cout << std::endl;
-  makeTexLoop(ptBinsC, "ptBinsC.tex");
-  makeTexLoop(ptBinsF, "ptBinsF.tex");
+  makeTexLoop(ptBins, "ptBins.tex");
 
   // Loop over different samples and jet types
   for(TString file : files){
@@ -79,7 +76,7 @@ int main(int argc, char**argv){
       // Creation of histos
       std::map<TString, TH1D*> plots;
       for(int etaBin = 0; etaBin < getNBins(etaBins); ++etaBin){
-        for(int ptBin = 0; ptBin < getNBins(etaBin == 0? ptBinsC : ptBinsF); ++ptBin){
+        for(int ptBin = 0; ptBin < getNBins(ptBins); ++ptBin){
           for(int rhoBin = 0; rhoBin < getNBins(rhoBins); ++rhoBin){
             for(TString type : {"quark","gluon","bquark","cquark"}){
               TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
@@ -98,15 +95,14 @@ int main(int argc, char**argv){
       for(int i = 0; i < qgMiniTuple->GetEntries(); ++i){
         qgMiniTuple->GetEntry(i);
         int rhoBin, etaBin, ptBin;
-        if(!getBinNumber(rhoBins, rho, rhoBin)) 			continue;
-        if(!getBinNumber(etaBins, fabs(eta), etaBin)) 			continue;
-        if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt, ptBin)) 	continue;
+        if(!getBinNumber(rhoBins, rho, rhoBin)) 	continue;
+        if(!getBinNumber(etaBins, fabs(eta), etaBin)) 	continue;
+        if(!getBinNumber(ptBins, pt, ptBin)) 		continue;
 
         if(jetIdLevel < 3) 		continue;
         if(mult < 3) 			continue; 										//Need at least three particles in the jet
 	if(!balanced) 			continue;										// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
         if(!matchedJet || nGenJetsInCone != 1 || nJetsForGenParticle != 1 || nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
-        if(fabs(eta) > 2 && fabs(eta) < 3) continue;									// Don't use 2.1 < |eta| < 2.9
 
         TString type;
         if(partonId == 21) 	 			type = "gluon";
@@ -202,7 +198,7 @@ int main(int argc, char**argv){
         t.SetTextSize(0.02);
         t.DrawLatex(0.9,0.98,  TString::Format("%.1f < #rho < %.1f", rhoBins[rhoBin], rhoBins[rhoBin+1]));
         t.DrawLatex(0.9,0.955, TString::Format("%.1f < #eta < %.1f", etaBins[etaBin], etaBins[etaBin+1]));
-        t.DrawLatex(0.9,0.93,  TString::Format("%.1f < p_{T} < %.1f", etaBin == 0? ptBinsC[ptBin] : ptBinsF[ptBin], etaBin == 0? ptBinsC[ptBin+1] : ptBinsF[ptBin+1]));
+        t.DrawLatex(0.9,0.93,  TString::Format("%.1f < p_{T} < %.1f", ptBins[ptBin], ptBins[ptBin+1]));
         t.SetTextAlign(13);
         t.DrawLatex(0.1,0.93,  jetType);
 

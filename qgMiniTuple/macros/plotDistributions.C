@@ -23,8 +23,8 @@ int main(int argc, char**argv){
   bool norm 			= true;
   TString qgMiniTuplesDir 	= "~tomc/public/merged/QGMiniTuple/"; // On T2B
 //  std::vector<TString> files	= {"QCD_Pt-1800_Tune4C_13TeV_pythia8"};
-  std::vector<TString> files	= {"QCD_AllPtBins"};
-//  std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
+//  std::vector<TString> files	= {"QCD_AllPtBins"};
+  std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
   std::vector<TString> jetTypes = {"AK4chs"};
 
   // To be used in case of file == QCD_AllPtBins:
@@ -34,14 +34,12 @@ int main(int argc, char**argv){
   std::vector<float>   xsec      = { 2237e6,  1615e5,  2211e4,  3000114,  493200,    120300,    7475,      587.1,     167,       28.25,      8.195,       0.7346,      0.102,        0.00644,     0.000163};
 
   // Define binning for plots
-  std::vector<float> etaBins = {0,2.5,4.7};
-  std::vector<float> ptBinsC; getBins(ptBinsC, 50, 20, 2500, true); ptBinsC.push_back(6500);
-  std::vector<float> ptBinsF; getBins(ptBinsF, 5, 20, 200, true); ptBinsF.push_back(1000);
+  std::vector<float> etaBins = {0,1.3,1.5,2,2.5,3,4.7};
+  std::vector<float> ptBins; getBins(ptBins, 20, 20, 2000, true); ptBins.push_back(6500);
   std::vector<float> rhoBins = {0,9999};
 
   printBins("eta", etaBins);
-  printBins("pt (central)", ptBinsC);
-  printBins("pt (forward)", ptBinsF);
+  printBins("pt", ptBins);
   printBins("rho", rhoBins); std::cout << std::endl;
 
   // Loop over different samples and jet types
@@ -83,7 +81,7 @@ int main(int argc, char**argv){
       std::map<TString, TH1D*> plots;
       std::map<TString, TH2D*> plots2D;
       for(int etaBin = 0; etaBin < getNBins(etaBins); ++etaBin){
-        for(int ptBin = 0; ptBin < getNBins(etaBin == 0? ptBinsC : ptBinsF); ++ptBin){
+        for(int ptBin = 0; ptBin < getNBins(ptBins); ++ptBin){
           for(int rhoBin = 0; rhoBin < getNBins(rhoBins); ++rhoBin){
             for(TString type : {"quark","gluon","bquark","cquark","pu","undefined"}){
               TString histName = "_" + type + TString::Format("_eta-%d_pt-%d_rho-%d", etaBin, ptBin, rhoBin);
@@ -106,9 +104,9 @@ int main(int argc, char**argv){
         qgMiniTuple->GetEntry(i);
 
         int rhoBin,etaBin,ptBin;
-        if(!getBinNumber(rhoBins, rho, rhoBin)) 			continue;
-        if(!getBinNumber(etaBins, fabs(eta), etaBin)) 			continue;
-        if(!getBinNumber(etaBin == 0? ptBinsC : ptBinsF, pt, ptBin)) 	continue;
+        if(!getBinNumber(rhoBins, rho, rhoBin)) 	continue;
+        if(!getBinNumber(etaBins, fabs(eta), etaBin)) 	continue;
+        if(!getBinNumber(ptBins, pt, ptBin)) 		continue;
         if(fabs(eta) > 2 && fabs(eta) < 3) continue;										// Don't use 2 < |eta| < 3
 
         if(jetIdLevel < 3) 		continue;										// Tight jets
@@ -211,7 +209,7 @@ int main(int argc, char**argv){
         t.SetTextSize(0.02);
         t.DrawLatex(0.9,0.98,  TString::Format("%.1f < #rho < %.1f", rhoBins[rhoBin], rhoBins[rhoBin+1]));
         t.DrawLatex(0.9,0.955, TString::Format("%.1f < #eta < %.1f", etaBins[etaBin], etaBins[etaBin+1]));
-        t.DrawLatex(0.9,0.93,  TString::Format("%.1f < p_{T} < %.1f", etaBin == 0? ptBinsC[ptBin] : ptBinsF[ptBin], etaBin == 0? ptBinsC[ptBin+1] : ptBinsF[ptBin+1]));
+        t.DrawLatex(0.9,0.93,  TString::Format("%.1f < p_{T} < %.1f", ptBins[ptBin], ptBins[ptBin+1]));
         t.SetTextAlign(13);
         t.DrawLatex(0.1,0.93,  jetType);
 
@@ -261,7 +259,7 @@ int main(int argc, char**argv){
         t.SetTextSize(0.02);
         t.DrawLatex(0.9,0.98,  TString::Format("%.1f < #rho < %.1f", rhoBins[rhoBin], rhoBins[rhoBin+1]));
         t.DrawLatex(0.9,0.955, TString::Format("%.1f < #eta < %.1f", etaBins[etaBin], etaBins[etaBin+1]));
-        t.DrawLatex(0.9,0.93,  TString::Format("%.1f < p_{T} < %.1f", etaBin == 0? ptBinsC[ptBin] : ptBinsF[ptBin], etaBin == 0? ptBinsC[ptBin+1] : ptBinsF[ptBin+1]));
+        t.DrawLatex(0.9,0.93,  TString::Format("%.1f < p_{T} < %.1f", ptBins[ptBin], ptBins[ptBin+1]));
         t.SetTextAlign(13);
         t.DrawLatex(0.1,0.93,  jetType);
         t.DrawLatex(0.35,0.98, "#color[2]{gluons}");
@@ -273,7 +271,7 @@ int main(int argc, char**argv){
 
         TString variables = histName(0, histName.First("_"));
         TString pdfDir = "./plots/distributions_2D/" + file + "/" + jetType + "/" + variables + "/";
-        TString pdfName = pdfDir + plot.first + ".jpg";
+        TString pdfName = pdfDir + plot.first + ".pdf";
         pdfName.ReplaceAll("_gluon","");
         system("mkdir -p " + pdfDir);
         c.SaveAs(pdfName);

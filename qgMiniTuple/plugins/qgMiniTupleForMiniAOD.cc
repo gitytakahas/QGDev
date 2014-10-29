@@ -22,6 +22,8 @@
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/Math/interface/deltaR.h"
 
+#include "localQGLikelihoodCalculator.h"
+
 #include "TFile.h"
 #include "TTree.h"
 
@@ -49,9 +51,11 @@ class qgMiniTupleForMiniAOD : public edm::EDAnalyzer{
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      float rho, pt, eta, axis2, ptD, bTag;
-      int nRun, nLumi, nEvent, mult, partonId, partonFlavour, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
+      float rho, pt, eta, axis2, ptD, bTag, qg, closestJetdR;
+      int nRun, nLumi, nEvent, mult, partonId, partonFlavour, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle, nOtherJetsInCone;
       bool matchedJet, balanced;
+
+      QGLikelihoodCalculator *qglcalc;
 };
 
 
@@ -64,6 +68,7 @@ qgMiniTupleForMiniAOD::qgMiniTupleForMiniAOD(const edm::ParameterSet& iConfig) :
   deltaRcut(							iConfig.getUntrackedParameter<double>("deltaRcut", 0.3)),
   pythia6(							iConfig.getUntrackedParameter<bool>("pythia6", false))
 {
+  qglcalc = new QGLikelihoodCalculator("/user/tomc/QGTagger/CMSSW_7_0_9_patch1/src/QGDev/qgMiniTuple/data/pdfQG_AK4chs_antib_13TeV.root");
 }
 
 
@@ -79,13 +84,12 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
 
   rho = (float) *rhoHandle;
 
-  if(jets->size() > 2){
+  if(genJets->size() > 2){
     auto jet1 = genJets->begin();
     auto jet2 = genJets->begin() + 1;
     auto jet3 = genJets->begin() + 2;
     balanced = (jet3->pt() < 0.15*(jet1->pt()+jet2->pt()));
   } else balanced = true;
-
 
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
     if(jet == jets->begin() + 2) balanced = false;
@@ -95,6 +99,15 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
     for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
       if(reco::deltaR(*jet, *genJet) < deltaRcut) ++nGenJetsInCone;
     }
+
+    nOtherJetsInCone = 0;
+    closestJetdR = 999;
+    for(auto otherJet = jets->begin(); otherJet != jets->end(); ++otherJet){
+      if(otherJet == jet) continue;
+      if(reco::deltaR(*jet, *otherJet) < 0.8) ++nOtherJetsInCone;
+      if(reco::deltaR(*jet, *otherJet) < closestJetdR) closestJetdR = reco::deltaR(*jet, *otherJet);
+    }
+
 
     partonId = 0; matchedJet = false;
     float deltaRmin = 999;
@@ -129,6 +142,8 @@ void qgMiniTupleForMiniAOD::analyze(const edm::Event& iEvent, const edm::EventSe
     eta			= jet->eta();
     bTag		= jet->bDiscriminator("combinedSecondaryVertexBJetTags");
 
+    qg 			= qglcalc->computeQGLikelihood(pt, eta, rho, {(float) mult, ptD, axis2});
+
     tree->Fill();
   }
 }
@@ -145,7 +160,10 @@ template <class jetClass> void qgMiniTupleForMiniAOD::calcVariables(const jetCla
     if(part->charge()){
       if(part->fromPV() > 1 && part->trackHighPurity()) nChg_QC++;
       else continue;
-    } else if(part->pt() > 1.0) nNeutral_ptCut++;
+    } else {
+      if(part->pt() > 1.0) nNeutral_ptCut++;
+      else continue;
+    }
 	  
     float deta = part->eta() - jet->eta();
     float dphi = reco::deltaPhi(part->phi(), jet->phi());
@@ -193,10 +211,13 @@ void qgMiniTupleForMiniAOD::beginJob(){
   tree->Branch("axis2",			&axis2,			"axis2/F");
   tree->Branch("ptD",			&ptD,			"ptD/F");
   tree->Branch("mult",			&mult,			"mult/I");
+  tree->Branch("qg",			&qg,			"qg/F");
   tree->Branch("bTag",			&bTag,			"bTag/F");
   tree->Branch("partonId",		&partonId,		"partonId/I");
   tree->Branch("partonFlavour",		&partonFlavour,		"partonFlavour/I");
   tree->Branch("nGenJetsInCone",	&nGenJetsInCone,	"nGenJetsInCone/I");
+  tree->Branch("closestJetdR",		&closestJetdR,		"closestJetdR/F");
+  tree->Branch("nOtherJetsInCone",	&nOtherJetsInCone,	"nOtherJetsInCone/I");
   tree->Branch("matchedJet",		&matchedJet,		"matchedJet/O");
   tree->Branch("balanced",		&balanced,		"balanced/O");
   tree->Branch("nGenJetsForGenParticle",&nGenJetsForGenParticle,"nGenJetsForGenParticle/I");

@@ -45,7 +45,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       bool jetId(const reco::PFJet *jet, bool tight = false, bool medium = false);
       template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC);
-      virtual void endJob() override {};
+      virtual void endJob() override;
 
       edm::EDGetTokenT<double> rhoToken;
       edm::EDGetTokenT<reco::VertexCollection> vertexToken;
@@ -66,8 +66,10 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::Service<TFileService> fs;
       TTree *tree;
 
-      float rho, pt, eta, axis2, ptD, bTag, closestJetdR;
-      int nRun, nLumi, nEvent, mult, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle, nOtherJetsInCone;
+      float rho, pt, eta, axis2, ptD, bTag;
+      std::vector<float> *closebyJetdR, *closebyJetPt;
+      std::vector<int> *closebyJetGenJetsInCone;
+      int nRun, nLumi, nEvent, mult, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
       bool matchedJet, balanced;
 };
 
@@ -94,6 +96,9 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
 
 
 void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
+  for(auto v : {closebyJetdR, closebyJetPt}) v->clear();
+  for(auto v : {closebyJetGenJetsInCone}) v->clear();
+
   nRun 		= (int) iEvent.id().run();
   nLumi 	= (int) iEvent.id().luminosityBlock();
   nEvent	= (int) iEvent.id().event();
@@ -123,7 +128,8 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
     if(jet == jets->begin() + 2) balanced = false;
-    if(jet->pt() < minJetPt) continue;
+    pt = jet->pt()*JEC->correction(*jet, iEvent, iSetup);
+    if(pt < minJetPt) continue;
     edm::RefToBase<reco::Jet> jetRef(edm::Ref<reco::PFJetCollection>(jets, (jet - jets->begin())));
 
     nGenJetsInCone = 0;
@@ -131,13 +137,33 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
       if(reco::deltaR(*jet, *genJet) < deltaRcut) ++nGenJetsInCone;
     }
 
-    nOtherJetsInCone = 0;
-    closestJetdR = 999;
+    // Closeby jet study variables
+    float closestJetdR = 999;
+    float closestJetPt = 0;
+    float nGenJetsInConeClosestJet = 0;
     for(auto otherJet = jets->begin(); otherJet != jets->end(); ++otherJet){
       if(otherJet == jet) continue;
-      if(reco::deltaR(*jet, *otherJet) < 0.8) ++nOtherJetsInCone;
-      if(reco::deltaR(*jet, *otherJet) < closestJetdR) closestJetdR = reco::deltaR(*jet, *otherJet);
+      float dR = reco::deltaR(*jet, *otherJet);
+      float nGenJetsInConeOtherJet = 0;
+      for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
+        if(reco::deltaR(*jet, *genJet) < deltaRcut) ++nGenJetsInConeOtherJet;
+      }
+      if(dR < 0.8){
+        closebyJetdR->push_back(dR);
+        closebyJetPt->push_back(otherJet->pt()*JEC->correction(*jet, iEvent, iSetup));
+        closebyJetGenJetsInCone->push_back(nGenJetsInConeOtherJet);
+      } else if(dR < closestJetdR){
+        closestJetdR = dR;
+        closestJetPt = otherJet->pt()*JEC->correction(*jet, iEvent, iSetup);
+        nGenJetsInConeClosestJet = nGenJetsInConeOtherJet;
+      }
     }
+    if(closestJetdR > 0.8){
+      closebyJetdR->push_back(closestJetdR);
+      closebyJetPt->push_back(closestJetPt);
+      closebyJetGenJetsInCone->push_back(nGenJetsInConeClosestJet);
+    }
+
 
     partonId = 0; matchedJet = false;
     float deltaRmin = 999;
@@ -163,7 +189,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
       for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
         if(reco::deltaR(*matchedGenParticle, *genJet) < deltaRcut) ++nGenJetsForGenParticle;
       }
-    }
+    } else continue; // For the moment (during closeby jet studies), do not save unmatched jets to reduce tree size
 
     pt			= jet->pt()*JEC->correction(*jet, iEvent, iSetup);
     eta			= jet->eta();
@@ -184,6 +210,9 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
 
 void qgMiniTuple::beginJob(){
+  for(auto v : {&closebyJetdR, &closebyJetPt}) *v = new std::vector<float>();
+  for(auto v : {&closebyJetGenJetsInCone})     *v = new std::vector<int>();
+
   tree = fs->make<TTree>("qgMiniTuple","qgMiniTuple");
   tree->Branch("nRun" ,			&nRun, 			"nRun/I");
   tree->Branch("nLumi" ,		&nLumi, 		"nLumi/I");
@@ -199,12 +228,18 @@ void qgMiniTuple::beginJob(){
   tree->Branch("partonFlavour",		&partonFlavour,		"partonFlavour/I");
   tree->Branch("jetIdLevel",		&jetIdLevel,		"jetIdLevel/I");
   tree->Branch("nGenJetsInCone",	&nGenJetsInCone,	"nGenJetsInCone/I");
-  tree->Branch("closestJetdR",		&closestJetdR,		"closestJetdR/F");
-  tree->Branch("nOtherJetsInCone",	&nOtherJetsInCone,	"nOtherJetsInCone/I");
   tree->Branch("matchedJet",		&matchedJet,		"matchedJet/O");
   tree->Branch("balanced",		&balanced,		"balanced/O");
   tree->Branch("nGenJetsForGenParticle",&nGenJetsForGenParticle,"nGenJetsForGenParticle/I");
   tree->Branch("nJetsForGenParticle",   &nJetsForGenParticle,   "nJetsForGenParticle/I");
+  tree->Branch("closebyJetdR",			"vector<float>",	&closebyJetdR);
+  tree->Branch("closebyJetPt",			"vector<float>",	&closebyJetPt);
+  tree->Branch("closebyJetGenJetsInCone",	"vector<int>",		&closebyJetGenJetsInCone);
+}
+
+void qgMiniTuple::endJob(){
+ for(auto v : {closebyJetdR, closebyJetPt}) delete v;
+ for(auto v : {closebyJetGenJetsInCone})    delete v;
 }
 
 

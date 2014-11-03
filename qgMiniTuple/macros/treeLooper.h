@@ -2,11 +2,15 @@
 #define treeLooper_h
 
 #include <vector>
+#include <map>
 #include <iostream>
 #include "TFile.h"
 #include "TChain.h"
 #include "TString.h"
 
+/*
+ * Class holding the tree variables, and taking care of the weights in case of binned QCD
+ */
 class treeLooper{
   private:
     TChain *qgMiniTuple;
@@ -18,18 +22,21 @@ class treeLooper{
 
   public:
     treeLooper(TString, TString, TString);
-    ~treeLooper();
+    ~treeLooper(){ delete qgMiniTuple;};
     bool next();
     void setMaxEntries(int i){ maxEntries = i;};
-  
+ 
     float rho, pt, eta, axis2, ptD, bTagValue, weight; 
     int nEvent, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle; 
     bool balanced, matchedJet, bTag;
 };
 
 
+/*
+ * Initialise tree with sample, jet type and (optional) location of tuples
+ */
 treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTuple/"){
-  if(jetType.Contains("antib")) useBTagging = true;
+  useBTagging = jetType.Contains("antib");
   jetType.ReplaceAll("_antib","");
   qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
 
@@ -63,10 +70,10 @@ treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = 
   maxEntries = qgMiniTuple->GetEntries();
 }
 
-treeLooper::~treeLooper(){
-  delete qgMiniTuple;
-}
 
+/*
+ * Get next entry (and return true), set back to start at end (and return false)
+ */
 bool treeLooper::next(){
   if(eventNumber < maxEntries){
     qgMiniTuple->GetEntry(eventNumber++);
@@ -80,6 +87,10 @@ bool treeLooper::next(){
   }
 }
 
+
+/*
+ * Set weight in case of binned QCD
+ */
 void treeLooper::setWeight(){
   if(usePtHatBins){
     int ptIndex = 0;

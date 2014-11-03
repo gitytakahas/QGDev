@@ -6,170 +6,100 @@
 #include "TH1D.h"
 #include "TCanvas.h"
 #include "TTree.h"
-#include "binFunctions.h"
-
-// Function to merge bins
-void addTo(std::multimap<TString, std::vector<std::vector<int>>>& mymultimap, TString variableAndType, std::vector<std::vector<int>> binList){
-  for(auto& i : mymultimap){
-    if(i.first == variableAndType && i.second[0] == binList[0]){
-      i.second.insert(i.second.end(), binList.begin() + 1, binList.end());
-      return;
-    }
-  }
-  mymultimap.insert(std::pair<TString, std::vector<std::vector<int>>>(variableAndType, binList));
-}
+#include "binClass.h"
+#include "treeLooper.h"
+#include "getTransform.h"
 
 
-// Main program
 int main(int argc, char**argv){
   bool fineBinning = true;
+  bool useDecorrelation = true;
 
   // Define binning for pdfs
-  std::vector<float> etaBins = {0,1.3,1.5,2,2.5,3,4.7};
-  std::vector<float> ptBins; getBins(ptBins, 20, 20, 2000, true); ptBins.push_back(6500);
-  std::vector<float> rhoBins = {0,9999};
+  binClass bins;
+  bins.setBinRange("eta", {0,1.3,1.5,2,2.5,3,4.7});
+  bins.setBinRange("pt" , bins.getBins(20, 20, 2000, true, {6500}));				// i.e. 20 bins from 20 to 2000 with log=true and with an additional bin up to 6500
+  bins.setBinRange("rho", {0, 9999});
+  bins.printBinRanges();
 
-  // Check binning
-  printBins("rho", rhoBins);
-  printBins("eta", etaBins);
-  printBins("pt", ptBins); std::cout << std::endl;
+  // Link some bins to be merged because of low statistics (for example higher pT bins at large eta)
+  for(int i=10; i < 21; ++i) bins.setLinks("eta5_pt9_rho0", {TString::Format("eta5_pt%d_rho0",i)});
+  for(int i=14; i < 21; ++i) bins.setLinks("eta4_pt13_rho0", {TString::Format("eta4_pt%d_rho0",i)});
+  for(int i=16; i < 21; ++i) bins.setLinks("eta3_pt15_rho0", {TString::Format("eta3_pt%d_rho0",i)});
+  for(int i=18; i < 21; ++i) bins.setLinks("eta2_pt17_rho0", {TString::Format("eta2_pt%d_rho0",i)});
+  for(int i=19; i < 21; ++i) bins.setLinks("eta1_pt18_rho0", {TString::Format("eta1_pt%d_rho0",i)});
 
-  // Link some bins to be merged (order eta - pt - rho) because of low statistics (for example higher pT bins at large eta)
-  // Should be redefined when changes are made to eta-pt-rho grid
-  std::multimap<TString, std::vector<std::vector<int>>> associatedBins;
-  for(TString type : {"gluon","quark"}){
-    for(TString var : {"axis2","mult","ptD"}){
-      for(int i=10; i <= 21; ++i) addTo(associatedBins, var + "_" + type, {{5,9,0}, {5,i,0}});
-      for(int i=14; i <= 21; ++i) addTo(associatedBins, var + "_" + type, {{4,13,0}, {4,i,0}});
-      for(int i=16; i <= 21; ++i) addTo(associatedBins, var + "_" + type, {{3,15,0}, {3,i,0}});
-      for(int i=18; i <= 21; ++i) addTo(associatedBins, var + "_" + type, {{2,17,0}, {2,i,0}});
-      for(int i=19; i <= 21; ++i) addTo(associatedBins, var + "_" + type, {{1,18,0}, {1,i,0}});
-    }
-  }
-
-  // For different jet types
-  system("rm -r ./plots/mergedBins/");
+  // For different jet types (if _antib is added bTag is applied)
   for(TString jetType : {"AK4chs","AK4chs_antib"}){//,"AK5","AK5chs","AK7","AK7chs"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
-    TString treePath = "qgMiniTuple"+jetType+"/qgMiniTuple";
-    treePath.ReplaceAll("_antib","");
 
-    // Init qgMiniTuple
-    TFile *qgMiniTupleFile = new TFile("~tomc/public/merged/QGMiniTuple/qgMiniTuple_QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14.root");
-    TTree *qgMiniTuple; qgMiniTupleFile->GetObject(treePath, qgMiniTuple);
-    float rho, pt, eta, axis2, ptD, bTag; 
-    int event, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle;
-    bool balanced, matchedJet;
-    qgMiniTuple->SetBranchAddress("rho", 			&rho);
-    qgMiniTuple->SetBranchAddress("nEvent", 			&event);
-    qgMiniTuple->SetBranchAddress("pt", 			&pt);
-    qgMiniTuple->SetBranchAddress("eta",	 		&eta);
-    qgMiniTuple->SetBranchAddress("axis2", 			&axis2);
-    qgMiniTuple->SetBranchAddress("ptD",	 		&ptD);
-    qgMiniTuple->SetBranchAddress("mult",	 		&mult);
-    qgMiniTuple->SetBranchAddress("bTag", 			&bTag);
-    qgMiniTuple->SetBranchAddress("partonId", 			&partonId);
-    qgMiniTuple->SetBranchAddress("jetIdLevel",	 		&jetIdLevel);
-    qgMiniTuple->SetBranchAddress("balanced",			&balanced);
-    qgMiniTuple->SetBranchAddress("matchedJet",			&matchedJet);
-    qgMiniTuple->SetBranchAddress("nGenJetsInCone",		&nGenJetsInCone);
-    qgMiniTuple->SetBranchAddress("nGenJetsForGenParticle",	&nGenJetsForGenParticle);
-    qgMiniTuple->SetBranchAddress("nJetsForGenParticle",	&nJetsForGenParticle);
+    treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree
+    bins.setReference("rho", &t.rho);
+    bins.setReference("pt",  &t.pt);
+    bins.setReference("eta", &t.eta);
+
+    std::map<TString, std::vector<std::vector<double>>> decorrelationMatrices;
+    if(useDecorrelation) decorrelationMatrices = getTransform(t, bins);
 
     // Creation of the pdfs
     std::map<TString, TH1D*> pdfs;
-    for(int etaBin = 0; etaBin < getNBins(etaBins); ++etaBin){
-      for(int ptBin = 0; ptBin < getNBins(ptBins); ++ptBin){
-        for(int rhoBin = 0; rhoBin < getNBins(rhoBins); ++rhoBin){
-          for(TString type : {"quark","gluon"}){
-            TString histName = "_" + type + TString::Format("_eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
-            pdfs["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, fineBinning ? 1000 : 200, 0, 8);
-            pdfs["ptD"   + histName] = new TH1D("ptD"   + histName, "ptD"   + histName, fineBinning ? 1000 : 200, 0, 1);
-            pdfs["mult"  + histName] = new TH1D("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
-          }
+    for(TString binName : bins.getAllBinNames()){
+      for(TString type : {"quark","gluon"}){
+        TString histName = "_" + type + "_" + binName;
+        pdfs["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, fineBinning ? 1000 : 200, 0, 8);
+        pdfs["mult"  + histName] = new TH1D("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
+        pdfs["ptD"   + histName] = new TH1D("ptD"   + histName, "ptD"   + histName, fineBinning ? 1000 : 200, 0, 1);
+        if(useDecorrelation){
+          auto varRanges = calcRangeTransformation(decorrelationMatrices[binName], {0, 0.5, 0}, {8, 100.5, 1});
+          pdfs["var1" + histName] = new TH1D("var1" + histName, "var1" + histName, fineBinning ? 1000 : 200, varRanges[0][0], varRanges[1][0]);
+          pdfs["var2" + histName] = new TH1D("var2" + histName, "var2" + histName, fineBinning ? 1000 : 200, varRanges[0][1], varRanges[1][1]);
+          pdfs["var3" + histName] = new TH1D("var3" + histName, "var3" + histName, fineBinning ? 1000 : 200, varRanges[0][2], varRanges[1][2]);
         }
       }
     }
 
     // Fill pdfs
-//  std::map<int, std::map<int, std::map<int, std::vector<int>*>>> eventsWithRho;
-//  int countDoubles = 0;
-//  int lastEvent = 0;
-//  bool skipEvent = false;
-    for(int i = 0; i < qgMiniTuple->GetEntries(); ++i){
-      qgMiniTuple->GetEntry(i);
-      int rhoBin, etaBin, ptBin;
-      if(!getBinNumber(rhoBins, rho, rhoBin)) 		continue;
-      if(!getBinNumber(etaBins, fabs(eta), etaBin)) 	continue;
-      if(!getBinNumber(ptBins, pt, ptBin)) 		continue;
+    while(t.next()){
+      if(!bins.update()) 	continue;										// Find bin and return false if outside ranges 
+      if(t.jetIdLevel < 3) 	continue;										// Select tight jets
+      if(!t.matchedJet) 	continue; 										// Only matched jets
+      if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
+      if((fabs(t.partonId) > 3 && t.partonId != 21)) continue; 								// Keep only udsg
+      if(t.bTag) continue;												// Anti-b tagging
+      if(!t.balanced) continue;												// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
+      TString type = (t.partonId == 21? "gluon" : "quark");								// Define q/g
+      TString histName = "_" + type + "_" + bins.name;
 
-//    if(lastEvent != event){												// A bit more complicated and less efficient because of our switch to flat trees
-//      lastEvent = event;
-//      if(eventAlreadyInRhoBin(eventsWithRho, rhoBin, event)){ ++countDoubles; skipEvent = true;}
-//      else skipEvent = false;
-//    }
-//    if(skipEvent) continue;
+      pdfs["axis2" + histName]->Fill(t.axis2);										// "axis2" already contains the log
+      pdfs["mult"  + histName]->Fill(t.mult);
+      pdfs["ptD"   + histName]->Fill(t.ptD);
 
-      if(jetIdLevel < 3) continue;											// Select tight jets
-      if(!matchedJet || nGenJetsInCone != 1 || nJetsForGenParticle != 1 || nGenJetsForGenParticle != 1) continue;	// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
-      if((fabs(partonId) > 3 && partonId != 21) || partonId == 0) continue;						// Keep only udsg
-      if(jetType.Contains("antib") && bTag >  0.244) continue;								// Anti-b tagging
-      if(!balanced) continue;												// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
-      TString type = (partonId == 21? "gluon" : "quark");								// Define q/g
-
-      TString histName = "_" + type + TString::Format("_eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
-
-      pdfs["axis2" + histName]->Fill(axis2);										// "axis2" already contains the log
-      pdfs["ptD"   + histName]->Fill(ptD);
-      pdfs["mult"  + histName]->Fill(mult);
-    }
-//  for(auto& i : eventsWithRho) for(auto& j : i.second) for(auto& k : j.second) delete k.second;
-//  std::cout << countDoubles << " doubles on a total of " << qgMiniTuple->GetEntries() << std::endl;
-
-    // Merging bins as defined above and storing a copy in each of them (could be checked by eye using ./plots/mergedBins)
-    for(auto i : associatedBins){
-      std::cout << "Merging ";
-      TCanvas c;
-      TH1D* temp = nullptr;
-      for(auto j : i.second){
-        TString histName = i.first + TString::Format("_eta%d_pt%d_rho%d", j[0], j[1], j[2]);
-        std::cout << histName << ", ";
-        if(!pdfs[histName]) continue;
-        if(!temp) temp = (TH1D*) pdfs[histName]->Clone();
-        else temp->Add(pdfs[histName]);
+      if(useDecorrelation){
+        std::vector<double> vars = {t.axis2, (double) t.mult, t.ptD};
+        std::vector<double> uncorrVars = decorrelate(decorrelationMatrices[bins.name], vars); 
+        pdfs["var1" + histName]->Fill(uncorrVars[0]);
+        pdfs["var2" + histName]->Fill(uncorrVars[1]);
+        pdfs["var3" + histName]->Fill(uncorrVars[2]);
       }
-      temp->Scale(1./temp->Integral(0, temp->GetNbinsX() + 1));
-      temp->SetLineColor(kRed);
-      temp->Draw("L");
-      std::cout << "..." << std::endl;
-      for(auto j : i.second){
-        TString histName = i.first + TString::Format("_eta%d_pt%d_rho%d", j[0], j[1], j[2]);
-        if(pdfs[histName]){
-          pdfs[histName]->Scale(1./pdfs[histName]->Integral(0, pdfs[histName]->GetNbinsX() + 1));
-          pdfs[histName]->DrawCopy("same L");
-          delete pdfs[histName];
-        }
-        pdfs[histName] = (TH1D*) temp->Clone(histName);
-      }
-      temp->Draw("same L");
-      TString pdfDir = "./plots/mergedBins/" + jetType + "/";
-      TString pdfName = pdfDir + temp->GetName() + ".pdf";
-      system("mkdir -p " + pdfDir);
-      c.SaveAs(pdfName);
-      delete temp;
     }
 
     // Make file and write binnings
-    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV.root","RECREATE");
+    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV_testWithVarTransform.root","RECREATE");
     pdfFile->cd();
-    writeBinsToFile(rhoBins, "rhoBins");
-    writeBinsToFile(etaBins, "etaBins");
-    writeBinsToFile(ptBins, "ptBins");
+    bins.writeBinsToFile();
+
+    if(useDecorrelation){
+      pdfFile->mkdir("decorrelationMatrices");
+      pdfFile->cd("decorrelationMatrices");
+      writeMatricesToFile(decorrelationMatrices, bins);
+      pdfFile->cd();
+    }
 
     // Write pdf's
     for(TString var : {"axis2","ptD","mult"}) pdfFile->mkdir(var);
+    if(useDecorrelation) for(TString var : {"var1","var2","var3"}) pdfFile->mkdir(var);
     for(auto& pdf : pdfs){
-      for(TString var: {"axis2","ptD","mult"}) if(pdf.first.Contains(var)) pdfFile->cd(var);
+      for(TString var: {"axis2","ptD","mult","var1","var2","var3"}) if(pdf.first.Contains(var)) pdfFile->cd(var);
       if(pdf.second->GetEntries() == 0) std::cout << "Warning: no entries in " << pdf.first << std::endl;		// Give warning for empty pdfs
 
       if(!fineBinning){													// Try to make pdf more stable:
@@ -212,10 +142,18 @@ int main(int argc, char**argv){
 
       pdf.second->Scale(1./pdf.second->Integral(0, pdf.second->GetNbinsX() + 1));					// Scale to integral=1 (also include underflow/overflow)
       pdf.second->Write();
+
+      TString thisBin = pdf.first;
+      for(TString i : {"gluon","quark","axis2","mult","ptD"}) thisBin.ReplaceAll(i + "_","");
+      for(auto i : bins.getLinkedBins(thisBin)){									// Store copies for merged bins
+        TString copyBin = pdf.first;
+        copyBin.ReplaceAll(thisBin, i);
+        pdf.second->Write(copyBin);
+      }
     }
 
     for(auto& pdf : pdfs) delete pdf.second;
-    for(auto& file : {pdfFile, qgMiniTupleFile}){ file->Close(); delete file;}
+    for(auto& file : {pdfFile}){ file->Close(); delete file;}
   }
   return 0;
 }

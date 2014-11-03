@@ -16,15 +16,16 @@
 
 
 /// Constructor
-QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename){
+QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename, bool transform = false){
   if(filename == "" || !this->init(filename)) throw std::runtime_error("Initialization failed: please check filename");
+  useTransformation = transform;
 }
 
 
 /// Initialisation of the QGLikelihoodCalculator
 bool QGLikelihoodCalculator::init(const TString& fileName){
   f = new TFile(fileName);
-  if(f->IsZombie()) 				return false;
+  if(f->IsZombie()) 					return false;
   if(!(this->getBinsFromFile(etaBins, "etaBins")))	return false;
   if(!(this->getBinsFromFile(ptBins,  "ptBins")))	return false;
   if(!(this->getBinsFromFile(rhoBins, "rhoBins")))	return false;
@@ -36,11 +37,15 @@ bool QGLikelihoodCalculator::init(const TString& fileName){
   TKey *keydir;
   while((keydir = (TKey*) nextdir())){
     if(!keydir->IsFolder()) continue;
-    TDirectory *dir = (TDirectory*) keydir->ReadObj() ;
-    TIter nexthist(dir->GetListOfKeys());
-    TKey *keyhist;
-    while((keyhist = (TKey*) nexthist())){
-      pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj();
+    TDirectory *dir = (TDirectory*) keydir->ReadObj();
+    if(TString(dir->GetName()) == "decorrelationMatrices"){
+      TIter nextmatrix(dir->GetListOfKeys());
+      TKey *keymatrix;
+      while((keymatrix = (TKey*) nextmatrix())) varTransforms[keymatrix->GetName()] = (TMatrixD*) keymatrix->ReadObj();
+    } else {
+      TIter nexthist(dir->GetListOfKeys());
+      TKey *keyhist;
+      while((keyhist = (TKey*) nexthist())) pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj();
     }
   }
   return true;
@@ -48,15 +53,21 @@ bool QGLikelihoodCalculator::init(const TString& fileName){
 
 
 /// Compute the QGLikelihood, given the pT, eta, rho and likelihood variables vector
-float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars){
+float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars_){
   if(!isValidRange(pt, rho, eta)) return -1;
+
+  TString binName;
+  if(!getBinName(binName, eta, pt, rho)) return -1;
+  std::vector<float> vars;
+  if(useTransformation) vars = transformation(binName, vars_);
+  else			vars = vars_;
 
   float Q=1., G=1.;
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
     if(vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
 
-    auto quarkEntry = findEntry(eta, pt, rho, 0, varIndex);
-    auto gluonEntry = findEntry(eta, pt, rho, 1, varIndex);
+    auto quarkEntry = findEntry(binName, 0, varIndex);
+    auto gluonEntry = findEntry(binName, 1, varIndex);
     if(!quarkEntry && !gluonEntry) return -2;
 
     int binQ = quarkEntry->FindBin(vars[varIndex]);
@@ -98,15 +109,22 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
 
 
 /// Compute the QGLikelihood using CDF, given the pT, eta, rho and likelihood variables vector
-float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float rho, std::vector<float> vars){
+float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float rho, std::vector<float> vars_){
   if(!isValidRange(pt, rho, eta)) return -1;
+
+  TString binName;
+  if(!getBinName(binName, eta, pt, rho)) return -1;
+  std::vector<float> vars;
+  if(useTransformation) vars = transformation(binName, vars_);
+  else			vars = vars_;
+
 
   float Q=1., G=1.;
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
     if(vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
 
-    auto quarkEntry = findEntry(eta, pt, rho, 0, varIndex);
-    auto gluonEntry = findEntry(eta, pt, rho, 1, varIndex);
+    auto quarkEntry = findEntry(binName, 0, varIndex);
+    auto gluonEntry = findEntry(binName, 1, varIndex);
     if(!quarkEntry || !gluonEntry) return -2;
 
     float cdfQuark = quarkEntry->Integral(0, quarkEntry->FindBin(vars[varIndex]));
@@ -150,15 +168,22 @@ float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float 
 
 
 /// Find matching entry for a given eta, pt, rho, qgIndex and varIndex
-TH1F* QGLikelihoodCalculator::findEntry(float eta, float pt, float rho, int qgIndex, int varIndex){
-  int etaBin, ptBin, rhoBin;
-  if(!getBinNumber(etaBins, fabs(eta), etaBin)) return nullptr;
-  if(!getBinNumber(ptBins, pt, ptBin)) 		return nullptr;
-  if(!getBinNumber(rhoBins, rho, rhoBin)) 	return nullptr;
-  TString histName = (varIndex == 2 ? "axis2" : (varIndex? "ptD" : "mult")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString::Format("_eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
+TH1F* QGLikelihoodCalculator::findEntry(TString& binName, int qgIndex, int varIndex){
+  TString histName;
+  if(useTransformation) histName = (varIndex == 2 ? "var1" : (varIndex? "var2" : "var3")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString("_") + binName;
+  else                  histName = (varIndex == 2 ? "axis2" : (varIndex? "ptD" : "mult")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString("_") +  binName;
   return pdfs[histName];
 }
 
+
+bool QGLikelihoodCalculator::getBinName(TString& binName, float eta, float pt, float rho){
+  int etaBin, ptBin, rhoBin;
+  if(!getBinNumber(etaBins, fabs(eta), etaBin)) return false;
+  if(!getBinNumber(ptBins, pt, ptBin)) 		return false;
+  if(!getBinNumber(rhoBins, rho, rhoBin)) 	return false;
+  binName = TString::Format("eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
+  return true;
+}
 
 /// Check the valid range of this qg tagger, using the bin vectors
 bool QGLikelihoodCalculator::isValidRange(float pt, float rho, float eta){
@@ -192,8 +217,20 @@ bool QGLikelihoodCalculator::getBinNumber(std::vector<float>& bins, float value,
 }
 
 
+/// Transformation to uncorrelated variables
+std::vector<float> QGLikelihoodCalculator::transformation(TString& binName, std::vector<float>& varVector){
+  std::vector<float> uncorrelatedVarVector(varVector);
+  for(int i = 0; i < varVector.size(); ++i){
+    uncorrelatedVarVector[i] = 0;
+    for(int j = 0; j <= i; ++j) uncorrelatedVarVector[i] += (*varTransforms[binName])[i][j]*varVector[j];
+  }
+  return uncorrelatedVarVector;
+}
+
+
 /// Destroy the QGLikelihoodCalculator
 QGLikelihoodCalculator::~QGLikelihoodCalculator(){
   for(auto& pdf : pdfs) delete pdf.second;
+  for(auto& matrix : varTransforms) delete matrix.second;
   delete f;
 }

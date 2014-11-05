@@ -16,7 +16,7 @@
 
 
 /// Constructor
-QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename, bool transform = false){
+QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename, bool transform){
   if(filename == "" || !this->init(filename)) throw std::runtime_error("Initialization failed: please check filename");
   useTransformation = transform;
 }
@@ -220,9 +220,9 @@ bool QGLikelihoodCalculator::getBinNumber(std::vector<float>& bins, float value,
 /// Transformation to uncorrelated variables
 std::vector<float> QGLikelihoodCalculator::transformation(TString& binName, std::vector<float>& varVector){
   std::vector<float> uncorrelatedVarVector(varVector);
-  for(int i = 0; i < varVector.size(); ++i){
+  for(unsigned int i = 0; i < varVector.size(); ++i){
     uncorrelatedVarVector[i] = 0;
-    for(int j = 0; j <= i; ++j) uncorrelatedVarVector[i] += (*varTransforms[binName])[i][j]*varVector[j];
+    for(unsigned int j = 0; j <= i; ++j) uncorrelatedVarVector[i] += (*varTransforms[binName])[i][j]*varVector[j];
   }
   return uncorrelatedVarVector;
 }

@@ -5,7 +5,7 @@ process = cms.Process("qgMiniTupleProducer")
 # Settings for local tests
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 100
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(-1))
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(100))
 process.source = cms.Source("PoolSource", 
     fileNames = cms.untracked.vstring('file:/user/tomc/public/TTJets_forSynch_1.root')
 )
@@ -20,14 +20,20 @@ process.TFileService = cms.Service("TFileService",
 )
 
 
-process.qgMiniTupleMiniAOD = cms.EDAnalyzer("qgMiniTupleForMiniAOD",
+process.qgMiniTuple = cms.EDAnalyzer("qgMiniTuple",
+    usePatJets			= cms.untracked.bool(True),
     fileName 			= cms.untracked.string('qgMiniTuple.root'),
     rhoInputTag			= cms.InputTag('fixedGridRhoFastjetAll'),
+    csvInputTag			= cms.InputTag('combinedSecondaryVertexBJetTags'),
+    vertexInputTag		= cms.InputTag('offlineSlimmedPrimaryVertices'),
     jetsInputTag		= cms.InputTag('slimmedJets'),
     genJetsInputTag		= cms.InputTag('slimmedGenJets'),
     genParticlesInputTag	= cms.InputTag('prunedGenParticles'),
     minJetPt			= cms.untracked.double(20.),
     deltaRcut			= cms.untracked.double(0.3),
+    jec				= cms.string(''),						# Ignored when using pat mode
+    jetFlavourInputTag		= cms.InputTag(''),						# Ignored when using pat mode
 )
 
-process.p = cms.Path(process.qgMiniTupleMiniAOD)
+
+process.p = cms.Path(process.qgMiniTuple)

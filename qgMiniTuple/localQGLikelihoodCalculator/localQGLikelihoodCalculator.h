@@ -13,7 +13,7 @@
 
 class QGLikelihoodCalculator{
   public:
-    QGLikelihoodCalculator(const TString& fileName, bool);
+    QGLikelihoodCalculator(const TString& fileName, bool transform = false);
     ~QGLikelihoodCalculator();
     float computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars_);
     float computeQGLikelihoodCDF(float pt, float eta, float rho, std::vector<float> vars_);

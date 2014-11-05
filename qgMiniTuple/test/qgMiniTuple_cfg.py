@@ -41,9 +41,6 @@ process.myRecoPFJets = cms.Sequence(process.fixedGridRhoFastjetAll + process.pfN
 # Jet energy corrections
 process.load('QGDev.qgMiniTuple.correctionSources_cff')
 
-# Gen jets
-
-
 # b-tagging
 for jetCollection in ['AK4','AK5','AK7','AK4CHS','AK5CHS','AK7CHS']: process.load('QGDev.qgMiniTuple.RecoBTag' + jetCollection + '_cff')
 
@@ -105,8 +102,8 @@ process.p = cms.Path(process.myRecoPFJets *
                      process.jetFlavourInfosAK4 * process.jetFlavourInfosAK4CHS *
 #                     process.jetFlavourInfosAK5 * process.jetFlavourInfosAK5CHS *
 #                     process.jetFlavourInfosAK7 * process.jetFlavourInfosAK7CHS *
-                     process.qgMiniTupleAK4 * process.qgMiniTupleAK4chs #*
+#                     process.qgMiniTupleAK4 *
+                     process.qgMiniTupleAK4chs #*
 #                     process.qgMiniTupleAK5 * process.qgMiniTupleAK5chs *
 #                     process.qgMiniTupleAK7 * process.qgMiniTupleAK7chs
-                    )
-
+)

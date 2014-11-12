@@ -87,6 +87,7 @@ void binClass::printBinRanges(){
 // To be called for every new event: true if bin is found
 bool binClass::update(){
   name = "";
+  if(!valuePointers.size()) name = "nobins";
   for(int i = 0; i < valuePointers.size(); ++i){
     if(!valuePointers[i]){ std::cout << "No reference value for " << valueNames[i] << " binning!" << std::endl; exit(1);}
     int binNumber;
@@ -115,6 +116,7 @@ std::vector<TString> binClass::getAllBinNames(bool alsoLinked = false){
       }
     }
   }
+  if(!allBinNames.size()) allBinNames.push_back("nobins");
   return allBinNames;
 }
 

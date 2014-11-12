@@ -80,7 +80,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
 //    QGLikelihoodCalculator *qglcalc;
 
       float rho, pt, eta, axis2, axis2_dR2, axis2_dR3, ptD, ptD_dR2, ptD_dR3, bTag;
-      int nRun, nLumi, nEvent, nPileUp, nTrue, nPriVtxs, mult, mult_dR2, mult_dR3, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
+      int nRun, nLumi, nEvent, nPileUp, nPriVtxs, mult, mult_dR2, mult_dR3, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
       bool matchedJet, balanced;
       std::vector<float> *closebyJetdR, *closebyJetPt;
       std::vector<int> *closebyJetGenJetsInCone;
@@ -291,7 +291,6 @@ void qgMiniTuple::beginJob(){
   tree->Branch("nLumi" ,		&nLumi, 		"nLumi/I");
   tree->Branch("nEvent" ,		&nEvent, 		"nEvent/I");
   tree->Branch("nPileUp",		&nPileUp, 		"nPileUp/I");
-  tree->Branch("nTrue",			&nTrue, 		"nTrue/I");
   tree->Branch("nPriVtxs",		&nPriVtxs, 		"nPriVtxs/I");
   tree->Branch("rho" ,			&rho, 			"rho/F");
   tree->Branch("pt" ,			&pt,			"pt/F");

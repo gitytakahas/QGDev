@@ -335,7 +335,7 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
   auto vtxLead = vC->begin();
 
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
-  int nChg_QC = 0, nNeutral_ptCut = 0;
+  int mult = 0;
 
   //Loop over the jet constituents
   for(auto daughter = jet->begin(); daughter < jet->end(); ++daughter){
@@ -343,12 +343,8 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
       auto part = dynamic_cast<const pat::PackedCandidate*> (&*daughter);
       if(!part) continue;
       if(part->charge()){
-        if(part->fromPV() > 1 && part->trackHighPurity()) nChg_QC++;
-        else continue;
-      } else {
-        if(part->pt() > 1.0) nNeutral_ptCut++;
-        else continue;
-      }
+        if(!(part->fromPV() > 1 && part->trackHighPurity())) continue;
+      } else if(part->pt() < 1.0) continue;
     } else {
       auto part = dynamic_cast<const reco::PFCandidate*> (&*daughter);
       if(!part) continue;
@@ -358,12 +354,8 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
         for(auto vtx = vC->begin(); vtx != vC->end(); ++vtx){
           if(fabs(itrk->dz(vtx->position())) < fabs(itrk->dz(vtxClose->position()))) vtxClose = vtx;
         }
-        if(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity"))) nChg_QC++;
-        else continue;
-      } else {
-        if(part->pt() > 1.0) nNeutral_ptCut++;
-        else continue;
-      }
+        if(!(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity")))) continue;
+      } else if(part->pt() < 1.0) continue;
     }
 
     float deta 	 = daughter->eta() - jet->eta();
@@ -373,6 +365,8 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
     float weight = partPt*partPt;
 
     if(dR > coneSize) continue;
+    ++mult;
+
     sum_weight 	 += weight;
     sum_pt 	 += partPt;
     sum_deta     += deta*weight;

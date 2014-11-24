@@ -17,9 +17,9 @@ int main(int argc, char**argv){
 
   // Define binning for pdfs
   binClass bins;
-  bins.setBinRange("eta", {0,1.3,1.5,2,2.5,3,4.7});
-  bins.setBinRange("pt" , bins.getBins(20, 20, 2000, true, {6500}));				// i.e. 20 bins from 20 to 2000 with log=true and with an additional bin up to 6500
-  bins.setBinRange("rho", {0, 9999});
+  bins.setBinRange("eta", 	"#eta",		{0,1.3,1.5,2,2.5,3,4.7});
+  bins.setBinRange("pt" , 	"p_{T}",	bins.getBins(20, 20, 2000, true, {6500}));				// i.e. 20 bins from 20 to 2000 with log=true and with an additional bin up to 6500
+  bins.setBinRange("rho",	"#rho",		{0,9999});
   bins.printBinRanges();
 
   // Link some bins to be merged because of low statistics (for example higher pT bins at large eta)
@@ -34,12 +34,37 @@ int main(int argc, char**argv){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
     treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree
-    bins.setReference("rho", &t.rho);
     bins.setReference("pt",  &t.pt);
     bins.setReference("eta", &t.eta);
+    bins.setReference("rho", &t.rho);
 
     std::map<TString, std::vector<std::vector<double>>> decorrelationMatrices;
     if(useDecorrelation) decorrelationMatrices = getTransform(t, bins);
+
+    std::map<TString, std::vector<double>> minVar;
+    std::map<TString, std::vector<double>> maxVar;
+    if(useDecorrelation){
+      for(TString binName : bins.getAllBinNames()){
+        minVar[binName] = std::vector<double>(3, 9999);
+        maxVar[binName] = std::vector<double>(3, -9999);
+      }
+      while(t.next()){
+        if(!bins.update()) 	continue;										// Find bin and return false if outside ranges
+        if(t.jetIdLevel < 3) 	continue;										// Select tight jets
+        if(!t.matchedJet) 	continue; 										// Only matched jets
+        if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
+        if((fabs(t.partonId) > 3 && t.partonId != 21)) continue; 							// Keep only udsg
+        if(t.bTag) 		continue;										// Anti-b tagging (onluy if jetType.Contains("antib")
+        if(t.mult < 3)		continue;
+
+        std::vector<double> vars = {t.axis2, t.ptD, (double) t.mult};
+        std::vector<double> uncorrVars = decorrelate(decorrelationMatrices[bins.name], vars);
+        for(int i = 0; i < 3; ++i){
+          if(uncorrVars[i] < minVar[bins.name][i]) minVar[bins.name][i] = uncorrVars[i];
+          if(uncorrVars[i] > maxVar[bins.name][i]) maxVar[bins.name][i] = uncorrVars[i];
+        }
+      }
+    }
 
     // Creation of the pdfs
     std::map<TString, TH1D*> pdfs;
@@ -47,13 +72,12 @@ int main(int argc, char**argv){
       for(TString type : {"quark","gluon"}){
         TString histName = "_" + type + "_" + binName;
         pdfs["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, fineBinning ? 1000 : 200, 0, 8);
-        pdfs["mult"  + histName] = new TH1D("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
+        pdfs["mult"  + histName] = new TH1D("mult"  + histName, "mult"  + histName, 140, 0.5, 140.5);
         pdfs["ptD"   + histName] = new TH1D("ptD"   + histName, "ptD"   + histName, fineBinning ? 1000 : 200, 0, 1);
         if(useDecorrelation){
-          auto varRanges = calcRangeTransformation(decorrelationMatrices[binName], {0, 0.5, 0}, {8, 100.5, 1});
-          pdfs["var1" + histName] = new TH1D("var1" + histName, "var1" + histName, fineBinning ? 1000 : 200, varRanges[0][0], varRanges[1][0]);
-          pdfs["var2" + histName] = new TH1D("var2" + histName, "var2" + histName, fineBinning ? 1000 : 200, varRanges[0][1], varRanges[1][1]);
-          pdfs["var3" + histName] = new TH1D("var3" + histName, "var3" + histName, fineBinning ? 1000 : 200, varRanges[0][2], varRanges[1][2]);
+          pdfs["var1" + histName] = new TH1D("var1" + histName, "var1" + histName, fineBinning ? 1000 : 200, minVar[binName][0]-0.01, maxVar[binName][0]+0.01);
+          pdfs["var2" + histName] = new TH1D("var2" + histName, "var2" + histName, fineBinning ? 1000 : 200, minVar[binName][1]-0.01, maxVar[binName][1]+0.01);
+          pdfs["var3" + histName] = new TH1D("var3" + histName, "var3" + histName, fineBinning ? 1000 : 200, minVar[binName][2]-0.01, maxVar[binName][2]+0.01);
         }
       }
     }
@@ -65,7 +89,7 @@ int main(int argc, char**argv){
       if(!t.matchedJet) 	continue; 										// Only matched jets
       if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
       if((fabs(t.partonId) > 3 && t.partonId != 21)) continue; 								// Keep only udsg
-      if(t.bTag) continue;												// Anti-b tagging
+      if(t.bTag) continue;												// Anti-b tagging (onluy if jetType.Contains("antib")
       if(!t.balanced) continue;												// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
       TString type = (t.partonId == 21? "gluon" : "quark");								// Define q/g
       TString histName = "_" + type + "_" + bins.name;
@@ -75,7 +99,7 @@ int main(int argc, char**argv){
       pdfs["ptD"   + histName]->Fill(t.ptD);
 
       if(useDecorrelation){
-        std::vector<double> vars = {t.axis2, (double) t.mult, t.ptD};
+        std::vector<double> vars = {t.axis2, t.ptD, (double) t.mult};
         std::vector<double> uncorrVars = decorrelate(decorrelationMatrices[bins.name], vars); 
         pdfs["var1" + histName]->Fill(uncorrVars[0]);
         pdfs["var2" + histName]->Fill(uncorrVars[1]);
@@ -144,7 +168,7 @@ int main(int argc, char**argv){
       pdf.second->Write();
 
       TString thisBin = pdf.first;
-      for(TString i : {"gluon","quark","axis2","mult","ptD"}) thisBin.ReplaceAll(i + "_","");
+      for(TString i : {"gluon","quark","axis2","mult","ptD","var1","var2","var3"}) thisBin.ReplaceAll(i + "_","");
       for(auto i : bins.getLinkedBins(thisBin)){									// Store copies for merged bins
         TString copyBin = pdf.first;
         copyBin.ReplaceAll(thisBin, i);

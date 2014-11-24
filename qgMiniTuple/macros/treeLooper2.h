@@ -24,15 +24,15 @@ class treeLooper{
     void setMaxEntries(int i){ maxEntries = i;};
  
     float rho, pt, eta, axis2, axis2_dR2, axis2_dR3, ptD, ptD_dR2, ptD_dR3, bTagValue, weight; 
-    int nEvent, mult, mult_dR2, mult_dR3, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle, nPriVtxs, nPileUp; 
+    int nEvent, nChg, nChg_dR2, nChg_dR3, mult, mult_dR2, mult_dR3, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle, nPriVtxs, nPileUp; 
     bool balanced, matchedJet, bTag;
-    float closestJetdR;
+    float closestJetdR, closestJetPt, closebyJetsInCone;
     std::vector<float> *closebyJetdR, *closebyJetPt;
     std::vector<int> *closebyJetGenJetsInCone;
 };
 
 
-treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTuple2/"){
+treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTuple3/"){
   useBTagging = jetType.Contains("antib");
   jetType.ReplaceAll("_antib","");
   qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
@@ -62,6 +62,9 @@ treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = 
   qgMiniTuple->SetBranchAddress("mult",	 			&mult);
   qgMiniTuple->SetBranchAddress("mult_dR2",	 		&mult_dR2);
   qgMiniTuple->SetBranchAddress("mult_dR3",	 		&mult_dR3);
+  qgMiniTuple->SetBranchAddress("nChg",	 			&nChg);
+  qgMiniTuple->SetBranchAddress("nChg_dR2",	 		&nChg_dR2);
+  qgMiniTuple->SetBranchAddress("nChg_dR3",	 		&nChg_dR3);
   qgMiniTuple->SetBranchAddress("partonId", 			&partonId);
   qgMiniTuple->SetBranchAddress("bTag", 			&bTagValue);
   qgMiniTuple->SetBranchAddress("jetIdLevel",			&jetIdLevel);
@@ -91,8 +94,12 @@ bool treeLooper::next(){
     qgMiniTuple->GetEntry(eventNumber++);
     eta = fabs(eta);
     bTag = (useBTagging && bTagValue > 0.244);
-    if(closebyJetdR->size()) closestJetdR = closebyJetdR->at(0);
-    else closestJetdR = 9999;
+    closebyJetsInCone = 0;
+    closestJetdR = 99999;
+    for(int i = 0; i < closebyJetdR->size(); ++i){
+      if(closebyJetdR->at(i) < 0.8) ++closebyJetsInCone;
+      if(closebyJetdR->at(i) < closestJetdR) closestJetdR = closebyJetdR->at(i);
+    }
     setWeight();
     return true;
   } else {

@@ -50,7 +50,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void beginJob() override;
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       template <class jetClass> bool jetId(const jetClass *jet, bool tight = false, bool medium = false);
-      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC, float conesize = 999);
+      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, int& nChg_, edm::Handle<reco::VertexCollection> vC, float conesize = 999);
       template <class jetCollection> void analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets);
       template <class jetCollection> edm::RefToBase<reco::Jet> jetRef(const jetCollection& jets, typename jetCollection::element_type::const_iterator& jet);
       virtual void endJob() override;
@@ -80,7 +80,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
 //    QGLikelihoodCalculator *qglcalc;
 
       float rho, pt, eta, axis2, axis2_dR2, axis2_dR3, ptD, ptD_dR2, ptD_dR3, bTag;
-      int nRun, nLumi, nEvent, nPileUp, nPriVtxs, mult, mult_dR2, mult_dR3, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
+      int nRun, nLumi, nEvent, nPileUp, nPriVtxs, mult, mult_dR2, mult_dR3, nChg, nChg_dR2, nChg_dR3, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
       bool matchedJet, balanced;
       std::vector<float> *closebyJetdR, *closebyJetPt;
       std::vector<int> *closebyJetGenJetsInCone;
@@ -204,7 +204,8 @@ template <class jetCollection> void qgMiniTuple::analyzeEvent(const edm::Event& 
         closebyJetdR->push_back(dR);
         closebyJetPt->push_back(otherJet->pt()*(usePatJets? 1. : JEC->correction(*jet, iEvent, iSetup)));
         closebyJetGenJetsInCone->push_back(nGenJetsInConeOtherJet);
-      } else if(dR < closestJetdR){
+      }
+      if(dR < closestJetdR){
         closestJetdR = dR;
         closestJetPt = otherJet->pt()*(usePatJets? 1. : JEC->correction(*jet, iEvent, iSetup));
         nGenJetsInConeClosestJet = nGenJetsInConeOtherJet;
@@ -256,9 +257,9 @@ template <class jetCollection> void qgMiniTuple::analyzeEvent(const edm::Event& 
       ptD		= (*ptDHandle)[jetRef(jets, jet)];*/
     }
 
-    calcVariables(&*jet, axis2,     ptD,     mult,     vertexCollection);
-    calcVariables(&*jet, axis2_dR2, ptD_dR2, mult_dR2, vertexCollection, 0.2);
-    calcVariables(&*jet, axis2_dR3, ptD_dR3, mult_dR3, vertexCollection, 0.3);
+    calcVariables(&*jet, axis2,     ptD,     mult,     nChg,     vertexCollection);
+    calcVariables(&*jet, axis2_dR2, ptD_dR2, mult_dR2, nChg_dR2, vertexCollection, 0.2);
+    calcVariables(&*jet, axis2_dR3, ptD_dR3, mult_dR3, nChg_dR3, vertexCollection, 0.3);
     axis2 		= -std::log(axis2);
     axis2_dR2 		= -std::log(axis2_dR2);
     axis2_dR3 		= -std::log(axis2_dR3);
@@ -304,6 +305,9 @@ void qgMiniTuple::beginJob(){
   tree->Branch("mult",			&mult,			"mult/I");
   tree->Branch("mult_dR2",		&mult_dR2,		"mult_dR2/I");
   tree->Branch("mult_dR3",		&mult_dR3,		"mult_dR3/I");
+  tree->Branch("nChg",			&nChg,			"nChg/I");
+  tree->Branch("nChg_dR2",		&nChg_dR2,		"nChg_dR2/I");
+  tree->Branch("nChg_dR3",		&nChg_dR3,		"nChg_dR3/I");
   tree->Branch("bTag",			&bTag,			"bTag/F");
   tree->Branch("partonId",		&partonId,		"partonId/I");
   tree->Branch("partonFlavour",		&partonFlavour,		"partonFlavour/I");
@@ -331,19 +335,23 @@ void qgMiniTuple::endJob(){
 /*
  * Calculation for of axis2, ptD and mult (works both on reco and pat)
  */
-template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, edm::Handle<reco::VertexCollection> vC, float coneSize){
+template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, int& nChg_, edm::Handle<reco::VertexCollection> vC, float coneSize){
   auto vtxLead = vC->begin();
 
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
-  int mult = 0;
+  mult_ = 0; nChg_ = 0;
 
   //Loop over the jet constituents
   for(auto daughter = jet->begin(); daughter < jet->end(); ++daughter){
+    float dR 	 = reco::deltaR(*daughter, *jet);
     if(usePatJets){
       auto part = dynamic_cast<const pat::PackedCandidate*> (&*daughter);
       if(!part) continue;
       if(part->charge()){
-        if(!(part->fromPV() > 1 && part->trackHighPurity())) continue;
+        if(!(part->fromPV() > 1 && part->trackHighPurity())){
+          if(dR < coneSize) ++nChg_;
+          continue;
+        }
       } else if(part->pt() < 1.0) continue;
     } else {
       auto part = dynamic_cast<const reco::PFCandidate*> (&*daughter);
@@ -354,18 +362,20 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
         for(auto vtx = vC->begin(); vtx != vC->end(); ++vtx){
           if(fabs(itrk->dz(vtx->position())) < fabs(itrk->dz(vtxClose->position()))) vtxClose = vtx;
         }
-        if(!(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity")))) continue;
+        if(!(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity")))){
+          if(dR < coneSize) ++nChg_;
+          continue;
+        }
       } else if(part->pt() < 1.0) continue;
     }
 
     float deta 	 = daughter->eta() - jet->eta();
     float dphi 	 = reco::deltaPhi(*daughter, *jet);
-    float dR 	 = reco::deltaR(*daughter, *jet);
     float partPt = daughter->pt();
     float weight = partPt*partPt;
 
     if(dR > coneSize) continue;
-    ++mult;
+    ++mult_;
 
     sum_weight 	 += weight;
     sum_pt 	 += partPt;
@@ -392,8 +402,6 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
   float delta 	= sqrt(fabs((a-b)*(a-b)+4*c*c));
   if(a+b-delta > 0) axis2_ = sqrt(0.5*(a+b-delta));
   else 		    axis2_ = 0.;
-
-  mult_ = (nChg_QC + nNeutral_ptCut);
 }
 
 

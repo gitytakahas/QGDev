@@ -20,6 +20,7 @@ template<typename T> void printMatrix(TString name, std::vector<std::vector<T>> 
     std::cout << std::endl << std::endl;
 }
 
+
 // Multiply nxn matrix
 template<typename T> std::vector<std::vector<T>> multiply(std::vector<std::vector<T>> matrix1, std::vector<std::vector<T>> matrix2){
   std::vector<std::vector<T>> resultMatrix(matrix1);
@@ -33,6 +34,7 @@ template<typename T> std::vector<std::vector<T>> multiply(std::vector<std::vecto
 }
 
 
+// Code to calculate decorrelation matrices
 std::map<TString, std::vector<std::vector<double>>> getTransform(treeLooper& t, binClass& bins){
 
   std::map<TString, int> nEvents;
@@ -54,9 +56,10 @@ std::map<TString, std::vector<std::vector<double>>> getTransform(treeLooper& t, 
       if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
       if((fabs(t.partonId) > 3 && t.partonId != 21)) continue;								// Keep only udsg
       if(t.bTag) continue;												// Anti-b tagging
-      if(t.axis2 > 8 || t.mult > 100 || t.ptD > 1.001) continue;							// Do not keep the large values
+      if(t.axis2 > 8 || t.mult > 140 || t.ptD > 1.0001) continue;							// Do not keep the large values
+      if(t.mult < 3)		continue;
 
-      std::vector<double> varVector{(double) t.axis2, (double) t.mult, (double) t.ptD};
+      std::vector<double> varVector{(double) t.axis2, (double) t.ptD, (double) t.mult};
 
       if(calcMean){													// First iteration: calculate the mean
         ++nEvents[bins.name];
@@ -131,6 +134,7 @@ std::map<TString, std::vector<std::vector<double>>> getTransform(treeLooper& t, 
 }
 
 
+// Function to transform variables to uncorrelated variables
 std::vector<double> decorrelate(std::vector<std::vector<double>>& transformMatrix, std::vector<double>& varVector){
   std::vector<double> uncorrelatedVarVector(varVector);
   for(int i = 0; i < varVector.size(); ++i){
@@ -141,6 +145,7 @@ std::vector<double> decorrelate(std::vector<std::vector<double>>& transformMatri
 }
 
 
+// Calculates the range of the uncorrelated variables
 std::vector<std::vector<double>> calcRangeTransformation(std::vector<std::vector<double>>& transformMatrix, std::vector<double> varDown, std::vector<double> varUp){
   std::vector<std::vector<double>> ranges(2, std::vector<double>(varDown));
   for(int i = 0; i < varDown.size(); ++i){
@@ -159,6 +164,7 @@ std::vector<std::vector<double>> calcRangeTransformation(std::vector<std::vector
 }
 
 
+// Writes matrices to file
 void writeMatricesToFile(std::map<TString, std::vector<std::vector<double>>>& matrices, binClass& bins){
   for(auto& matrix : matrices){
     TMatrixD tmatrix(matrix.second.size(), matrix.second.size());
@@ -172,6 +178,8 @@ void writeMatricesToFile(std::map<TString, std::vector<std::vector<double>>>& ma
   }
 }
 
+
+// Reads the matrices from file
 bool getMatricesFromFile(std::map<TString, std::vector<std::vector<double>>>& matrices, TString fileName){
   TFile *f = new TFile(fileName);
   if(f->IsZombie()) return false;

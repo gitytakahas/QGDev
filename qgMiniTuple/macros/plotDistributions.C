@@ -4,15 +4,11 @@
 #include <map>
 #include <iostream>
 #include <iomanip>
-#include "TChain.h"
-#include "TTree.h"
-#include "TFile.h"
 #include "TH1D.h"
 #include "TH2D.h"
 #include "THStack.h"
 #include "TCanvas.h"
 #include "TLegend.h"
-#include "TLatex.h"
 #include "TVector.h"
 #include "binClass.h"
 #include "treeLooper2.h"
@@ -23,13 +19,13 @@
 int main(int argc, char**argv){
   bool overlay 			= true;
   bool norm 			= true;
-  bool plot2D			= true;
+  bool plot2D			= false;
   bool useDecorrelation		= false;
 
   // Define binning for plots
   binClass bins;
-  bins.setBinRange("eta", {0,1.3,1.5,2,2.5,3,4.7});
-  bins.setBinRange("pt" , bins.getBins(20, 20, 2000, true, {6500}));				// i.e. 20 bins from 20 to 2000 with log=true and with an additional bin up to 6500
+  bins.setBinRange("eta",	"#eta",		{0,1.3,1.5,2,2.5,3,4.7});
+  bins.setBinRange("pt" , 	"p_{T}",	bins.getBins(20, 20, 2000, true, {6500}));				// i.e. 20 bins from 20 to 2000 with log=true and with an additional bin up to 6500
 //  bins.setBinRange("cbjdR", {0, 0.55, 0.65,0.75,1,2,9999});
   bins.printBinRanges();
 
@@ -197,16 +193,7 @@ int main(int argc, char**argv){
         c.Modified();
         l.Draw();
 
-        TLatex t;
-        t.SetNDC(kTRUE);
-        t.SetTextAlign(33);
-        t.SetTextSize(0.02);
-   //     t.DrawLatex(0.9,0.98,  TString::Format("%.1f < #rho < %.1f", bins.getLowerEdge(plot.first, "rho"), bins.getUpperEdge(plot.first, "rho")));
-   //     t.DrawLatex(0.9,0.98,  TString::Format("%.1f < dR(closest jet) < %.1f", bins.getLowerEdge(plot.first, "cbjdR"), bins.getUpperEdge(plot.first, "cbjdR")));
-        t.DrawLatex(0.9,0.955, TString::Format("%.1f < #eta < %.1f", bins.getLowerEdge(plot.first, "eta"), bins.getUpperEdge(plot.first, "eta")));
-        t.DrawLatex(0.9,0.93,  TString::Format("%.1f < p_{T} < %.1f", bins.getLowerEdge(plot.first, "pt"), bins.getUpperEdge(plot.first, "pt")));
-        t.SetTextAlign(13);
-        t.DrawLatex(0.1,0.93,  jetType);
+        bins.printInfoOnPlot(plot.first, jetType);
 
         TString variable = "";
         for(TString var: {"axis2","ptD","mult","qg"}) if(plot.first.Contains(var)) variable = var;
@@ -244,21 +231,7 @@ int main(int argc, char**argv){
         plot.second->Draw("SCAT");
         plots2D[histName]->Draw("SCAT same");
 
-        TLatex t;
-        t.SetNDC(kTRUE);
-        t.SetTextAlign(33);
-        t.SetTextSize(0.02);
-        t.DrawLatex(0.9,0.98,  TString::Format("%.1f < #rho < %.1f", bins.getLowerEdge(plot.first, "rho"), bins.getUpperEdge(plot.first, "rho")));
-        t.DrawLatex(0.9,0.955, TString::Format("%.1f < #eta < %.1f", bins.getLowerEdge(plot.first, "eta"), bins.getUpperEdge(plot.first, "eta")));
-        t.DrawLatex(0.9,0.93,  TString::Format("%.1f < p_{T} < %.1f", bins.getLowerEdge(plot.first, "pt"), bins.getUpperEdge(plot.first, "pt")));
-        t.SetTextAlign(13);
-        t.DrawLatex(0.1,0.93,  jetType);
-        t.DrawLatex(0.35,0.98, "#color[2]{gluons}");
-        t.DrawLatex(0.35,0.955,TString::Format("#color[2]{mean: %f}", plot.second->GetMean()));
-        t.DrawLatex(0.35,0.93, TString::Format("#color[2]{RMS: %f}", plot.second->GetRMS()));
-        t.DrawLatex(0.55,0.98, "#color[4]{quarks}");
-        t.DrawLatex(0.55,0.955,TString::Format("#color[4]{mean: %f}", plots2D[histName]->GetMean()));
-        t.DrawLatex(0.55,0.93, TString::Format("#color[4]{RMS: %f}", plots2D[histName]->GetRMS()));
+        bins.printInfoOnPlot(plot.first, jetType);
 
         TString variables = histName(0, histName.First("_"));
         TString pdfDir = "./plots/distributions_2D/" + file + "/" + jetType + "/" + variables + "/";

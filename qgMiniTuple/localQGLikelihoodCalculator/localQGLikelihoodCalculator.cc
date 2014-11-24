@@ -16,9 +16,10 @@
 
 
 /// Constructor
-QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename, bool transform){
-  if(filename == "" || !this->init(filename)) throw std::runtime_error("Initialization failed: please check filename");
+QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename, bool transform, bool boostMultiplicity_){
+  if(filename == "" || !this->init(filename)) throw std::runtime_error(("Initialization failed: " + filename + " not found or corrupt!").Data());
   useTransformation = transform;
+  boostMultiplicity = boostMultiplicity_;
 }
 
 
@@ -64,7 +65,7 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
 
   float Q=1., G=1.;
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
-    if(vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
+    if(!useTransformation && vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
 
     auto quarkEntry = findEntry(binName, 0, varIndex);
     auto gluonEntry = findEntry(binName, 1, varIndex);
@@ -98,9 +99,19 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
           ++g;
         }
       }
-    } 
-    Q*=Qi/Qw;
-    G*=Gi/Gw;
+    }
+    if(boostMultiplicity){
+      std::vector<double> powFactor;
+      if(pt > 150 && fabs(eta) < 2.5) powFactor = {5./3.,2/3.,2./3.};
+      else if(fabs(eta) < 3) powFactor = {4./3.,2.5/3.,2.5/3.};
+      else if(fabs(eta) > 3) powFactor = {2./3.,3.5/3.,3.5/3.};
+      else powFactor = {1.,1.,1.};
+      Q*=std::pow((double)Qi/Qw, powFactor[varIndex]);
+      G*=std::pow((double)Gi/Gw, powFactor[varIndex]);
+    } else {
+      Q*=Qi/Qw;
+      G*=Gi/Gw;
+    }
   }
 
   if(Q==0) return 0;
@@ -121,7 +132,7 @@ float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float 
 
   float Q=1., G=1.;
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
-    if(vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
+    if(!useTransformation && vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
 
     auto quarkEntry = findEntry(binName, 0, varIndex);
     auto gluonEntry = findEntry(binName, 1, varIndex);
@@ -158,8 +169,18 @@ float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float 
       }
     }
 
-    Q*=Qi;
-    G*=Gi;
+    if(boostMultiplicity){
+      std::vector<double> powFactor;
+      if(pt > 150 && fabs(eta) < 2.5) powFactor = {5./3.,2/3.,2./3.};
+      else if(fabs(eta) < 3) powFactor = {4./3.,2.5/3.,2.5/3.};
+      else if(fabs(eta) > 3) powFactor = {2./3.,3.5/3.,3.5/3.};
+      else powFactor = {1.,1.,1.};
+      Q*=std::pow((double)Qi, powFactor[varIndex]);
+      G*=std::pow((double)Gi, powFactor[varIndex]);
+    } else {
+      Q*=Qi;
+      G*=Gi;
+    }
   }
 
   if(Q+G <= 0) return 0.5;
@@ -170,7 +191,7 @@ float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float 
 /// Find matching entry for a given eta, pt, rho, qgIndex and varIndex
 TH1F* QGLikelihoodCalculator::findEntry(TString& binName, int qgIndex, int varIndex){
   TString histName;
-  if(useTransformation) histName = (varIndex == 2 ? "var1" : (varIndex? "var2" : "var3")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString("_") + binName;
+  if(useTransformation) histName = (varIndex == 2 ? "var3" : (varIndex? "var2" : "var1")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString("_") + binName;
   else                  histName = (varIndex == 2 ? "axis2" : (varIndex? "ptD" : "mult")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString("_") +  binName;
   return pdfs[histName];
 }

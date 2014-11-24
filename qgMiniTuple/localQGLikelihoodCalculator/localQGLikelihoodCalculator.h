@@ -13,7 +13,7 @@
 
 class QGLikelihoodCalculator{
   public:
-    QGLikelihoodCalculator(const TString& fileName, bool transform = false);
+    QGLikelihoodCalculator(const TString& fileName, bool transform = false, bool boostMultiplicity_ = false);
     ~QGLikelihoodCalculator();
     float computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars_);
     float computeQGLikelihoodCDF(float pt, float eta, float rho, std::vector<float> vars_);
@@ -31,6 +31,6 @@ class QGLikelihoodCalculator{
     std::map<TString, TH1F*> pdfs; 
     std::map<TString, TMatrixD*> varTransforms;
     TFile* f;
-    bool useTransformation;
+    bool useTransformation, boostMultiplicity;
 };
 #endif

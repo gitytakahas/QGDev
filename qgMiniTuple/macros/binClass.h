@@ -6,6 +6,8 @@
 #include <iostream>
 #include <fstream>
 #include "TVector.h"
+#include "TLatex.h"
+#include "TRegexp.h"
 
 /*
  * Class to take care of binning the pdfs/plots and related functions
@@ -13,6 +15,7 @@
 class binClass{
   private:
     std::vector<TString> valueNames;
+    std::vector<TString> valueDisplayNames;
     std::vector<float*> valuePointers;
     std::vector<std::vector<float>> binRanges;
     std::map<TString, std::vector<TString>> linkedBins;
@@ -23,8 +26,9 @@ class binClass{
     ~binClass(){};
     bool update();
     bool getBinNumber(std::vector<float>&, float*, int&);
-    void setBinRange(TString, std::vector<float>);
+    void setBinRange(TString, TString, std::vector<float>);
     void printBinRanges(); 
+    void printInfoOnPlot(TString, TString);
     void setReference(TString, float*);
     std::vector<float> getBins(int, float, float, bool, std::vector<float>);
     std::vector<TString> getAllBinNames(bool);
@@ -60,8 +64,9 @@ void binClass::setLinks(TString master, std::vector<TString> toBeLinked){
 
 
 // Set bin ranges for variable
-void binClass::setBinRange(TString name, std::vector<float> varBinning){
+void binClass::setBinRange(TString name, TString displayName, std::vector<float> varBinning){
   valueNames.push_back(name);
+  valueDisplayNames.push_back(displayName);
   valuePointers.push_back(nullptr);
   binRanges.push_back(varBinning);
 }
@@ -145,7 +150,7 @@ bool binClass::getBinNumber(std::vector<float>& bins, float* value, int& bin){
 // Find lower and upper edge from variable in bin
 float binClass::getUpperEdge(TString binName, TString varName){ return getLowerEdge(binName, varName, true);}
 float binClass::getLowerEdge(TString binName, TString varName, bool upper = false){
-  TString sub = binName(binName.Index(varName) + varName.Length(), binName.Length());
+  TString sub = binName(binName.Index(TRegexp(varName+"[0-9]")) + varName.Length(), binName.Length());
   TString bin = sub.Contains('_')? sub(0, sub.Index('_')) : sub;
   int index = bin.Atoi() + (upper? 1 : 0);
   auto it = std::find(valueNames.begin(), valueNames.end(), varName);
@@ -160,6 +165,25 @@ void binClass::writeBinsToFile(){
     TVectorT<float> tbins(binRanges[i].size(), &binRanges[i][0]);
     tbins.Write(valueNames[i] + "Bins");
   }
+}
+
+
+// Print bin ranges on plot
+void binClass::printInfoOnPlot(TString binName, TString jetType){
+  TLatex t;
+  t.SetNDC(kTRUE);
+  t.SetTextAlign(31);
+  t.SetTextSize(0.02);
+  float height = 0.025;
+  if(valueNames.size() > 3){
+    height = 0.08/(float)valueNames.size();
+    t.SetTextSize(0.07/(float) valueNames.size());
+  }
+  for(int i = 0; i < valueNames.size(); ++i){
+    t.DrawLatex(0.9,0.91+i*height, TString::Format("%.2f < " + valueDisplayNames[i] + " < %.2f", getLowerEdge(binName, valueNames[i]), getUpperEdge(binName, valueNames[i])));
+  }
+  t.SetTextAlign(11);
+  t.DrawLatex(0.1,0.91,  jetType);
 }
 
 

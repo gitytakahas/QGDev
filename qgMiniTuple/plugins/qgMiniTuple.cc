@@ -190,31 +190,17 @@ template <class jetCollection> void qgMiniTuple::analyzeEvent(const edm::Event& 
     }
 
     // Closeby jet study variables
-    float closestJetdR = 999;
-    float closestJetPt = 0;
-    float nGenJetsInConeClosestJet = 0;
     for(auto otherJet = jets->begin(); otherJet != jets->end(); ++otherJet){
       if(otherJet == jet) continue;
       float dR = reco::deltaR(*jet, *otherJet);
+      if(dR > 1.2) continue;
       float nGenJetsInConeOtherJet = 0;
       for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
-        if(reco::deltaR(*jet, *genJet) < deltaRcut) ++nGenJetsInConeOtherJet;
+        if(reco::deltaR(*otherJet, *genJet) < deltaRcut) ++nGenJetsInConeOtherJet;
       }
-      if(dR < 0.8){
-        closebyJetdR->push_back(dR);
-        closebyJetPt->push_back(otherJet->pt()*(usePatJets? 1. : JEC->correction(*jet, iEvent, iSetup)));
-        closebyJetGenJetsInCone->push_back(nGenJetsInConeOtherJet);
-      }
-      if(dR < closestJetdR){
-        closestJetdR = dR;
-        closestJetPt = otherJet->pt()*(usePatJets? 1. : JEC->correction(*jet, iEvent, iSetup));
-        nGenJetsInConeClosestJet = nGenJetsInConeOtherJet;
-      }
-    }
-    if(closestJetdR > 0.8){
-      closebyJetdR->push_back(closestJetdR);
-      closebyJetPt->push_back(closestJetPt);
-      closebyJetGenJetsInCone->push_back(nGenJetsInConeClosestJet);
+      closebyJetdR->push_back(dR);
+      closebyJetPt->push_back(otherJet->pt()*(usePatJets? 1. : JEC->correction(*jet, iEvent, iSetup)));
+      closebyJetGenJetsInCone->push_back(nGenJetsInConeOtherJet);
     }
 
     // Parton Id matching
@@ -348,10 +334,8 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
       auto part = dynamic_cast<const pat::PackedCandidate*> (&*daughter);
       if(!part) continue;
       if(part->charge()){
-        if(!(part->fromPV() > 1 && part->trackHighPurity())){
-          if(dR < coneSize) ++nChg_;
-          continue;
-        }
+        if(!(part->fromPV() > 1 && part->trackHighPurity())) continue;
+        else if(dR < coneSize) ++nChg_;
       } else if(part->pt() < 1.0) continue;
     } else {
       auto part = dynamic_cast<const reco::PFCandidate*> (&*daughter);
@@ -362,10 +346,8 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
         for(auto vtx = vC->begin(); vtx != vC->end(); ++vtx){
           if(fabs(itrk->dz(vtx->position())) < fabs(itrk->dz(vtxClose->position()))) vtxClose = vtx;
         }
-        if(!(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity")))){
-          if(dR < coneSize) ++nChg_;
-          continue;
-        }
+        if(!(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity")))) continue;
+        else if(dR < coneSize) ++nChg_;
       } else if(part->pt() < 1.0) continue;
     }
 

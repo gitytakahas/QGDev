@@ -24,7 +24,7 @@ class treeLooper{
     void setMaxEntries(int i){ maxEntries = i;};
  
     float rho, pt, eta, axis2, axis2_dR2, axis2_dR3, ptD, ptD_dR2, ptD_dR3, bTagValue, weight; 
-    int nEvent, nChg, nChg_dR2, nChg_dR3, mult, mult_dR2, mult_dR3, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle, nPriVtxs, nPileUp; 
+    int nEvent, nChg, nChg_dR2, nChg_dR3, nNeutral, nNeutral_dR2, nNeutral_dR3, mult, mult_dR2, mult_dR3, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle, nPriVtxs, nPileUp; 
     bool balanced, matchedJet, bTag;
     float closestJetdR, closestJetPt, closebyJetsInCone;
     std::vector<float> *closebyJetdR, *closebyJetPt;
@@ -97,9 +97,13 @@ bool treeLooper::next(){
     closebyJetsInCone = 0;
     closestJetdR = 99999;
     for(int i = 0; i < closebyJetdR->size(); ++i){
+//      if(closebyJetPt->at(i) < 20) continue;
       if(closebyJetdR->at(i) < 0.8) ++closebyJetsInCone;
       if(closebyJetdR->at(i) < closestJetdR) closestJetdR = closebyJetdR->at(i);
     }
+    nNeutral = mult - nChg;
+    nNeutral_dR2 = mult_dR2 - nChg_dR2;
+    nNeutral_dR3 = mult_dR3 - nChg_dR3;
     setWeight();
     return true;
   } else {

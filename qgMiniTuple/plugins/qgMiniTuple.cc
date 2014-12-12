@@ -51,7 +51,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       template <class jetClass> bool jetId(const jetClass *jet, bool tight = false, bool medium = false);
       template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, int& nChg_, edm::Handle<reco::VertexCollection> vC, float conesize = 999);
-      template <class jetCollection> void analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const jetCollection& jetsAK8);
+      template <class jetCollection, class candidateCollection> void analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const jetCollection& jetsAK8, const candidateCollection& pfCandidates);
       template <class jetCollection> edm::RefToBase<reco::Jet> jetRef(const jetCollection& jets, typename jetCollection::element_type::const_iterator& jet);
       virtual void endJob() override;
 
@@ -66,7 +66,8 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::EDGetTokenT<pat::JetCollection> patJetsToken;
       edm::EDGetTokenT<pat::JetCollection> patJetsTokenAK8;
       edm::EDGetTokenT<reco::PFCandidateCollection> pfCandidatesToken;
-      edm::InputTag jetsInputTag, jetsInputTagAK8;
+      edm::EDGetTokenT<pat::PackedCandidateCollection> patCandidatesToken;
+      edm::InputTag jetsInputTag, jetsInputTagAK8, pfCandidatesInputTag;
       edm::InputTag csvInputTag;
       std::string jecService;
       std::string jecServiceAK8;
@@ -100,9 +101,9 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
   genJetsToken(    	consumes<reco::GenJetCollection>(			iConfig.getParameter<edm::InputTag>("genJetsInputTag"))),
   genParticlesToken(    consumes<reco::GenParticleCollection>(			iConfig.getParameter<edm::InputTag>("genParticlesInputTag"))),
   jetFlavourToken(	consumes<reco::JetFlavourInfoMatchingCollection>( 	iConfig.getParameter<edm::InputTag>("jetFlavourInputTag"))),
-  pfCandidatesToken(	consumes<reco::PFCandidateCollection>(			iConfig.getParameter<edm::InputTag>("pfCandidatesInputTag"))),
   jetsInputTag(    								iConfig.getParameter<edm::InputTag>("jetsInputTag")),
   jetsInputTagAK8( 	 							iConfig.getParameter<edm::InputTag>("jetsInputTagAK8")),
+  pfCandidatesInputTag(								iConfig.getParameter<edm::InputTag>("pfCandidatesInputTag")),
   csvInputTag(    								iConfig.getParameter<edm::InputTag>("csvInputTag")),
   jecService( 									iConfig.getParameter<std::string>("jec")),
   jecServiceAK8(								iConfig.getParameter<std::string>("jecAK8")),
@@ -114,8 +115,10 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
 {
   jetsToken	=	consumes<reco::PFJetCollection>(	edm::InputTag(jetsInputTag));
   jetsTokenAK8	=	consumes<reco::PFJetCollection>(	edm::InputTag(jetsInputTagAK8));
+  pfCandidatesToken =	consumes<reco::PFCandidateCollection>(  edm::InputTag(pfCandidatesInputTag));
   patJetsToken	=	consumes<pat::JetCollection>(		edm::InputTag(jetsInputTag));
   patJetsTokenAK8 =	consumes<pat::JetCollection>(		edm::InputTag(jetsInputTagAK8));
+  patCandidatesToken =	consumes<pat::PackedCandidateCollection>(edm::InputTag(pfCandidatesInputTag));
   bTagToken	= 	consumes<reco::JetTagCollection>(       edm::InputTag(csvInputTag));
 /*qgToken	= 	consumes<edm::ValueMap<float>>(		edm::InputTag(qgVariablesInputTag.label(), "qgLikelihood"));
   axis2Token	= 	consumes<edm::ValueMap<float>>(		edm::InputTag(qgVariablesInputTag.label(), "axis2Likelihood"));
@@ -139,17 +142,21 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
   if(usePatJets){
     edm::Handle<pat::JetCollection> jets;
     edm::Handle<pat::JetCollection> jetsAK8;
+    edm::Handle<pat::PackedCandidateCollection> pfCandidates;
     iEvent.getByToken(patJetsToken, jets);
     iEvent.getByToken(patJetsTokenAK8, jetsAK8);
-    analyzeEvent(iEvent, iSetup, jets, jetsAK8);
+    iEvent.getByToken(patCandidatesToken, pfCandidates);
+    analyzeEvent(iEvent, iSetup, jets, jetsAK8, pfCandidates);
   } else {
     JEC = JetCorrector::getJetCorrector(jecService, iSetup);
     JECAK8 = JetCorrector::getJetCorrector(jecServiceAK8, iSetup);
     edm::Handle<reco::PFJetCollection> jets;
     edm::Handle<reco::PFJetCollection> jetsAK8;
+    edm::Handle<reco::PFCandidateCollection> pfCandidates;
     iEvent.getByToken(jetsToken, jets);
     iEvent.getByToken(jetsTokenAK8, jetsAK8);
-    analyzeEvent(iEvent, iSetup, jets, jetsAK8);
+    iEvent.getByToken(pfCandidatesToken, pfCandidates);
+    analyzeEvent(iEvent, iSetup, jets, jetsAK8, pfCandidates);
   }
 }
 
@@ -157,13 +164,13 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 /*
  * Analyze event
  */
-template <class jetCollection> void qgMiniTuple::analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const jetCollection& jetsAK8){
+template <class jetCollection, class candidateCollection> void qgMiniTuple::analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const jetCollection& jetsAK8, const candidateCollection& pfCandidates){
   edm::Handle<std::vector<PileupSummaryInfo>> PupInfo;					iEvent.getByLabel("addPileupInfo", 	PupInfo);
   edm::Handle<reco::VertexCollection> vertexCollection;					iEvent.getByToken(vertexToken, 		vertexCollection);
   edm::Handle<double> rhoHandle;							iEvent.getByToken(rhoToken, 		rhoHandle);
   edm::Handle<reco::GenJetCollection> genJets;						iEvent.getByToken(genJetsToken, 	genJets);
   edm::Handle<reco::GenParticleCollection> genParticles;				iEvent.getByToken(genParticlesToken, 	genParticles);
-  edm::Handle<reco::PFCandidateCollection> pfCandidates;				iEvent.getByToken(pfCandidatesToken, 	pfCandidates);
+//  edm::Handle<reco::PFCandidateCollection> pfCandidates;				iEvent.getByToken(pfCandidatesToken, 	pfCandidates);
   edm::Handle<reco::JetFlavourInfoMatchingCollection> jetFlavours;	if(!usePatJets) iEvent.getByToken(jetFlavourToken, 	jetFlavours);
   edm::Handle<reco::JetTagCollection> bTagHandle;			if(!usePatJets) iEvent.getByToken(bTagToken, 		bTagHandle);
 /*edm::Handle<edm::ValueMap<float>> qgHandle;				if(!usePatJets)	iEvent.getByToken(qgToken, 		qgHandle);

@@ -18,8 +18,6 @@
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
-#include "SimDataFormats/JetMatching/interface/JetFlavourInfo.h"
-#include "SimDataFormats/JetMatching/interface/JetFlavourInfoMatching.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
@@ -59,12 +57,9 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::EDGetTokenT<reco::VertexCollection> vertexToken;
       edm::EDGetTokenT<reco::GenJetCollection> genJetsToken;
       edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken;
-      edm::EDGetTokenT<reco::JetFlavourInfoMatchingCollection> jetFlavourToken;
       edm::EDGetTokenT<reco::JetTagCollection> bTagToken;
-      edm::EDGetTokenT<reco::PFJetCollection> jetsToken;
-      edm::EDGetTokenT<reco::PFJetCollection> jetsTokenAK8;
-      edm::EDGetTokenT<pat::JetCollection> patJetsToken;
-      edm::EDGetTokenT<pat::JetCollection> patJetsTokenAK8;
+      edm::EDGetTokenT<reco::PFJetCollection> jetsToken, jetsTokenAK8;
+      edm::EDGetTokenT<pat::JetCollection> patJetsToken, patJetsTokenAK8;
       edm::EDGetTokenT<reco::PFCandidateCollection> pfCandidatesToken;
       edm::EDGetTokenT<pat::PackedCandidateCollection> patCandidatesToken;
       edm::InputTag jetsInputTag, jetsInputTagAK8, pfCandidatesInputTag;
@@ -85,7 +80,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
 //    QGLikelihoodCalculator *qglcalc;
 
       float rho, pt, eta, axis2, ptD, bTag, deltaRAK8, ptAK8, ptDoubleCone;
-      int nRun, nLumi, nEvent, nPileUp, nPriVtxs, mult, nChg, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
+      int nRun, nLumi, nEvent, nPileUp, nPriVtxs, mult, nChg, partonId, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
       bool matchedJet, balanced;
       std::vector<float> *closebyJetdR, *closebyJetPt;
       std::vector<int> *closebyJetGenJetsInCone;
@@ -100,7 +95,6 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
   vertexToken(    	consumes<reco::VertexCollection>(			iConfig.getParameter<edm::InputTag>("vertexInputTag"))),
   genJetsToken(    	consumes<reco::GenJetCollection>(			iConfig.getParameter<edm::InputTag>("genJetsInputTag"))),
   genParticlesToken(    consumes<reco::GenParticleCollection>(			iConfig.getParameter<edm::InputTag>("genParticlesInputTag"))),
-  jetFlavourToken(	consumes<reco::JetFlavourInfoMatchingCollection>( 	iConfig.getParameter<edm::InputTag>("jetFlavourInputTag"))),
   jetsInputTag(    								iConfig.getParameter<edm::InputTag>("jetsInputTag")),
   jetsInputTagAK8( 	 							iConfig.getParameter<edm::InputTag>("jetsInputTagAK8")),
   pfCandidatesInputTag(								iConfig.getParameter<edm::InputTag>("pfCandidatesInputTag")),
@@ -171,7 +165,6 @@ template <class jetCollection, class candidateCollection> void qgMiniTuple::anal
   edm::Handle<reco::GenJetCollection> genJets;						iEvent.getByToken(genJetsToken, 	genJets);
   edm::Handle<reco::GenParticleCollection> genParticles;				iEvent.getByToken(genParticlesToken, 	genParticles);
 //  edm::Handle<reco::PFCandidateCollection> pfCandidates;				iEvent.getByToken(pfCandidatesToken, 	pfCandidates);
-  edm::Handle<reco::JetFlavourInfoMatchingCollection> jetFlavours;	if(!usePatJets) iEvent.getByToken(jetFlavourToken, 	jetFlavours);
   edm::Handle<reco::JetTagCollection> bTagHandle;			if(!usePatJets) iEvent.getByToken(bTagToken, 		bTagHandle);
 /*edm::Handle<edm::ValueMap<float>> qgHandle;				if(!usePatJets)	iEvent.getByToken(qgToken, 		qgHandle);
   edm::Handle<edm::ValueMap<float>> axis2Handle; 			if(!usePatJets)	iEvent.getByToken(axis2Token, 		axis2Handle);
@@ -254,10 +247,8 @@ template <class jetCollection, class candidateCollection> void qgMiniTuple::anal
 
     if(usePatJets){
       auto patjet = dynamic_cast<const pat::Jet*> (&*jet);
-      partonFlavour	= patjet->partonFlavour();
       bTag		= patjet->bDiscriminator(csvInputTag.label());
     } else {
-      partonFlavour	= (*jetFlavours)[jetRef(jets, jet)].getPartonFlavour();
       bTag		= (*bTagHandle)[jetRef(jets, jet)];
 /*    qg		= (*qgHandle)[jetRef(jets, jet)];
       axis2		= (*axis2Handle)[jetRef(jets, jet)];
@@ -320,7 +311,6 @@ void qgMiniTuple::beginJob(){
   tree->Branch("nChg",			&nChg,			"nChg/I");
   tree->Branch("bTag",			&bTag,			"bTag/F");
   tree->Branch("partonId",		&partonId,		"partonId/I");
-  tree->Branch("partonFlavour",		&partonFlavour,		"partonFlavour/I");
   tree->Branch("jetIdLevel",		&jetIdLevel,		"jetIdLevel/I");
   tree->Branch("nGenJetsInCone",	&nGenJetsInCone,	"nGenJetsInCone/I");
   tree->Branch("matchedJet",		&matchedJet,		"matchedJet/O");

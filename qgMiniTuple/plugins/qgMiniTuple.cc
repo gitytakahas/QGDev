@@ -49,41 +49,36 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       template <class jetClass> bool jetId(const jetClass *jet, bool tight = false, bool medium = false);
       template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, int& nChg_, edm::Handle<reco::VertexCollection> vC);
-      template <class jetCollection, class candidateCollection> void analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const jetCollection& jetsAK8, const candidateCollection& pfCandidates);
+      template <class jetCollection, class candidateCollection> void analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const candidateCollection& pfCandidates);
       template <class jetCollection> edm::RefToBase<reco::Jet> jetRef(const jetCollection& jets, typename jetCollection::element_type::const_iterator& jet);
       virtual void endJob() override;
 
-      edm::EDGetTokenT<double> rhoToken;
-      edm::EDGetTokenT<reco::VertexCollection> vertexToken;
-      edm::EDGetTokenT<reco::GenJetCollection> genJetsToken;
-      edm::EDGetTokenT<reco::GenParticleCollection> genParticlesToken;
-      edm::EDGetTokenT<reco::JetTagCollection> bTagToken;
-      edm::EDGetTokenT<reco::PFJetCollection> jetsToken, jetsTokenAK8;
-      edm::EDGetTokenT<pat::JetCollection> patJetsToken, patJetsTokenAK8;
-      edm::EDGetTokenT<reco::PFCandidateCollection> pfCandidatesToken;
-      edm::EDGetTokenT<pat::PackedCandidateCollection> patCandidatesToken;
-      edm::InputTag jetsInputTag, jetsInputTagAK8, pfCandidatesInputTag;
-      edm::InputTag csvInputTag;
-      std::string jecService;
-      std::string jecServiceAK8;
-/*    edm::InputTag qgVariablesInputTag;
-      edm::EDGetTokenT<edm::ValueMap<float>> qgToken, axis2Token, ptDToken;
-      edm::EDGetTokenT<edm::ValueMap<int>> multToken;*/
-      const double minJetPt;
-      const double deltaRcut;
-      const bool pythia6;
-      const bool usePatJets;
+      edm::EDGetTokenT<double> 				rhoToken;
+      edm::EDGetTokenT<reco::VertexCollection> 		vertexToken;
+      edm::EDGetTokenT<reco::GenJetCollection> 		genJetsToken;
+      edm::EDGetTokenT<reco::GenParticleCollection> 	genParticlesToken;
+      edm::EDGetTokenT<reco::JetTagCollection> 		bTagToken;
+      edm::EDGetTokenT<reco::PFJetCollection> 		jetsToken;
+      edm::EDGetTokenT<pat::JetCollection> 		patJetsToken;
+      edm::EDGetTokenT<reco::PFCandidateCollection> 	pfCandidatesToken;
+      edm::EDGetTokenT<pat::PackedCandidateCollection> 	patCandidatesToken;
+      edm::InputTag 					jetsInputTag, pfCandidatesInputTag, csvInputTag;
+      std::string 					jecService;
+/*    edm::InputTag 					qgVariablesInputTag;
+      edm::EDGetTokenT<edm::ValueMap<float>> 		qgToken, axis2Token, ptDToken;
+      edm::EDGetTokenT<edm::ValueMap<int>> 		multToken;*/
+      const double 					minJetPt, deltaRcut;
+      const bool 					pythia6, usePatJets;
 
-      const JetCorrector *JEC, *JECAK8;
-      edm::Service<TFileService> fs;
-      TTree *tree;
-//    QGLikelihoodCalculator *qglcalc;
+      const JetCorrector 				*JEC;
+      edm::Service<TFileService> 			fs;
+      TTree 						*tree;
+//    QGLikelihoodCalculator 				*qglcalc;
 
-      float rho, pt, eta, axis2, ptD, bTag, deltaRAK8, ptAK8, ptDoubleCone;
-      int nRun, nLumi, nEvent, nPileUp, nPriVtxs, mult, nChg, partonId, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
+      float rho, pt, eta, axis2, ptD, bTag, ptDoubleCone;
+      int nEvent, nPileUp, nPriVtxs, mult, nChg, partonId, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
       bool matchedJet, balanced;
       std::vector<float> *closebyJetdR, *closebyJetPt;
-      std::vector<int> *closebyJetGenJetsInCone;
 };
 
 
@@ -96,29 +91,25 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
   genJetsToken(    	consumes<reco::GenJetCollection>(			iConfig.getParameter<edm::InputTag>("genJetsInputTag"))),
   genParticlesToken(    consumes<reco::GenParticleCollection>(			iConfig.getParameter<edm::InputTag>("genParticlesInputTag"))),
   jetsInputTag(    								iConfig.getParameter<edm::InputTag>("jetsInputTag")),
-  jetsInputTagAK8( 	 							iConfig.getParameter<edm::InputTag>("jetsInputTagAK8")),
   pfCandidatesInputTag(								iConfig.getParameter<edm::InputTag>("pfCandidatesInputTag")),
   csvInputTag(    								iConfig.getParameter<edm::InputTag>("csvInputTag")),
-  jecService( 									iConfig.getParameter<std::string>("jec")),
-  jecServiceAK8(								iConfig.getParameter<std::string>("jecAK8")),
 //qgVariablesInputTag(  							iConfig.getParameter<edm::InputTag>("qgVariablesInputTag")),
+  jecService( 									iConfig.getParameter<std::string>("jec")),
   minJetPt(									iConfig.getUntrackedParameter<double>("minJetPt", 20.)),
   deltaRcut(									iConfig.getUntrackedParameter<double>("deltaRcut", 0.3)),
   pythia6(									iConfig.getUntrackedParameter<bool>("pythia6", false)),
   usePatJets(									iConfig.getUntrackedParameter<bool>("usePatJets", false))
 {
-  jetsToken	=	consumes<reco::PFJetCollection>(	edm::InputTag(jetsInputTag));
-  jetsTokenAK8	=	consumes<reco::PFJetCollection>(	edm::InputTag(jetsInputTagAK8));
-  pfCandidatesToken =	consumes<reco::PFCandidateCollection>(  edm::InputTag(pfCandidatesInputTag));
-  patJetsToken	=	consumes<pat::JetCollection>(		edm::InputTag(jetsInputTag));
-  patJetsTokenAK8 =	consumes<pat::JetCollection>(		edm::InputTag(jetsInputTagAK8));
-  patCandidatesToken =	consumes<pat::PackedCandidateCollection>(edm::InputTag(pfCandidatesInputTag));
-  bTagToken	= 	consumes<reco::JetTagCollection>(       edm::InputTag(csvInputTag));
-/*qgToken	= 	consumes<edm::ValueMap<float>>(		edm::InputTag(qgVariablesInputTag.label(), "qgLikelihood"));
-  axis2Token	= 	consumes<edm::ValueMap<float>>(		edm::InputTag(qgVariablesInputTag.label(), "axis2Likelihood"));
-  multToken	= 	consumes<edm::ValueMap<int>>(		edm::InputTag(qgVariablesInputTag.label(), "multLikelihood"));
-  ptDToken	= 	consumes<edm::ValueMap<float>>(		edm::InputTag(qgVariablesInputTag.label(), "ptDLikelihood"));*/
-//qglcalc 	= 	new QGLikelihoodCalculator("/user/tomc/QGTagger/CMSSW_7_0_9_patch1/src/QGDev/qgMiniTuple/data/pdfQG_AK4chs_antib_13TeV.root");
+  jetsToken		=	consumes<reco::PFJetCollection>(		edm::InputTag(jetsInputTag));
+  pfCandidatesToken 	=	consumes<reco::PFCandidateCollection>(  	edm::InputTag(pfCandidatesInputTag));
+  patJetsToken		=	consumes<pat::JetCollection>(			edm::InputTag(jetsInputTag));
+  patCandidatesToken 	=	consumes<pat::PackedCandidateCollection>(	edm::InputTag(pfCandidatesInputTag));
+  bTagToken		= 	consumes<reco::JetTagCollection>(       	edm::InputTag(csvInputTag));
+/*qgToken		= 	consumes<edm::ValueMap<float>>(			edm::InputTag(qgVariablesInputTag.label(), "qgLikelihood"));
+  axis2Token		= 	consumes<edm::ValueMap<float>>(			edm::InputTag(qgVariablesInputTag.label(), "axis2Likelihood"));
+  multToken		= 	consumes<edm::ValueMap<int>>(			edm::InputTag(qgVariablesInputTag.label(), "multLikelihood"));
+  ptDToken		= 	consumes<edm::ValueMap<float>>(			edm::InputTag(qgVariablesInputTag.label(), "ptDLikelihood"));*/
+//qglcalc 		= 	new QGLikelihoodCalculator("/user/tomc/QGTagger/CMSSW_7_0_9_patch1/src/QGDev/qgMiniTuple/data/pdfQG_AK4chs_antib_13TeV.root");
 }
 
 
@@ -127,30 +118,18 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
  */
 void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup){
   for(auto v : {closebyJetdR, closebyJetPt}) v->clear();
-  for(auto v : {closebyJetGenJetsInCone})    v->clear();
 
-  nRun 		= (int) iEvent.id().run();
-  nLumi 	= (int) iEvent.id().luminosityBlock();
   nEvent	= (int) iEvent.id().event();
 
   if(usePatJets){
-    edm::Handle<pat::JetCollection> jets;
-    edm::Handle<pat::JetCollection> jetsAK8;
-    edm::Handle<pat::PackedCandidateCollection> pfCandidates;
-    iEvent.getByToken(patJetsToken, jets);
-    iEvent.getByToken(patJetsTokenAK8, jetsAK8);
-    iEvent.getByToken(patCandidatesToken, pfCandidates);
-    analyzeEvent(iEvent, iSetup, jets, jetsAK8, pfCandidates);
+    edm::Handle<pat::JetCollection> 		jets;			iEvent.getByToken(patJetsToken,		jets);
+    edm::Handle<pat::PackedCandidateCollection> pfCandidates;		iEvent.getByToken(patCandidatesToken, 	pfCandidates);
+    analyzeEvent(iEvent, iSetup, jets, pfCandidates);
   } else {
-    JEC = JetCorrector::getJetCorrector(jecService, iSetup);
-    JECAK8 = JetCorrector::getJetCorrector(jecServiceAK8, iSetup);
-    edm::Handle<reco::PFJetCollection> jets;
-    edm::Handle<reco::PFJetCollection> jetsAK8;
-    edm::Handle<reco::PFCandidateCollection> pfCandidates;
-    iEvent.getByToken(jetsToken, jets);
-    iEvent.getByToken(jetsTokenAK8, jetsAK8);
-    iEvent.getByToken(pfCandidatesToken, pfCandidates);
-    analyzeEvent(iEvent, iSetup, jets, jetsAK8, pfCandidates);
+    JEC 	= JetCorrector::getJetCorrector(jecService, 	iSetup);
+    edm::Handle<reco::PFJetCollection> 		jets;			iEvent.getByToken(jetsToken, jets);
+    edm::Handle<reco::PFCandidateCollection> 	pfCandidates;     	iEvent.getByToken(pfCandidatesToken, pfCandidates);
+    analyzeEvent(iEvent, iSetup, jets, pfCandidates);
   }
 }
 
@@ -158,13 +137,12 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 /*
  * Analyze event
  */
-template <class jetCollection, class candidateCollection> void qgMiniTuple::analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const jetCollection& jetsAK8, const candidateCollection& pfCandidates){
+template <class jetCollection, class candidateCollection> void qgMiniTuple::analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const candidateCollection& pfCandidates){
   edm::Handle<std::vector<PileupSummaryInfo>> PupInfo;					iEvent.getByLabel("addPileupInfo", 	PupInfo);
   edm::Handle<reco::VertexCollection> vertexCollection;					iEvent.getByToken(vertexToken, 		vertexCollection);
   edm::Handle<double> rhoHandle;							iEvent.getByToken(rhoToken, 		rhoHandle);
   edm::Handle<reco::GenJetCollection> genJets;						iEvent.getByToken(genJetsToken, 	genJets);
   edm::Handle<reco::GenParticleCollection> genParticles;				iEvent.getByToken(genParticlesToken, 	genParticles);
-//  edm::Handle<reco::PFCandidateCollection> pfCandidates;				iEvent.getByToken(pfCandidatesToken, 	pfCandidates);
   edm::Handle<reco::JetTagCollection> bTagHandle;			if(!usePatJets) iEvent.getByToken(bTagToken, 		bTagHandle);
 /*edm::Handle<edm::ValueMap<float>> qgHandle;				if(!usePatJets)	iEvent.getByToken(qgToken, 		qgHandle);
   edm::Handle<edm::ValueMap<float>> axis2Handle; 			if(!usePatJets)	iEvent.getByToken(axis2Token, 		axis2Handle);
@@ -209,13 +187,8 @@ template <class jetCollection, class candidateCollection> void qgMiniTuple::anal
       if(otherJet == jet) continue;
       float dR = reco::deltaR(*jet, *otherJet);
       if(dR > 1.2) continue;
-      float nGenJetsInConeOtherJet = 0;
-      for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
-        if(reco::deltaR(*otherJet, *genJet) < deltaRcut) ++nGenJetsInConeOtherJet;
-      }
       closebyJetdR->push_back(dR);
       closebyJetPt->push_back(otherJet->pt()*(usePatJets? 1. : JEC->correction(*jet, iEvent, iSetup)));
-      closebyJetGenJetsInCone->push_back(nGenJetsInConeOtherJet);
     }
 
     // Parton Id matching
@@ -243,32 +216,20 @@ template <class jetCollection, class candidateCollection> void qgMiniTuple::anal
       for(auto genJet = genJets->begin(); genJet != genJets->end(); ++genJet){
         if(reco::deltaR(*matchedGenParticle, *genJet) < deltaRcut) ++nGenJetsForGenParticle;
       }
-    } else continue;												//Keep only matched jets for the moment
+    }
 
     if(usePatJets){
       auto patjet = dynamic_cast<const pat::Jet*> (&*jet);
       bTag		= patjet->bDiscriminator(csvInputTag.label());
-    } else {
-      bTag		= (*bTagHandle)[jetRef(jets, jet)];
-/*    qg		= (*qgHandle)[jetRef(jets, jet)];
-      axis2		= (*axis2Handle)[jetRef(jets, jet)];
-      mult		= (*multHandle)[jetRef(jets, jet)];
-      ptD		= (*ptDHandle)[jetRef(jets, jet)];*/
-    }
+    } else bTag		= (*bTagHandle)[jetRef(jets, jet)];
+/*  qg			= (*qgHandle)[jetRef(jets, jet)];
+    axis2		= (*axis2Handle)[jetRef(jets, jet)];
+    mult		= (*multHandle)[jetRef(jets, jet)];
+    ptD			= (*ptDHandle)[jetRef(jets, jet)];*/
 
-    calcVariables(&*jet, axis2,     ptD,     mult,     nChg,     vertexCollection);
+    calcVariables(&*jet, axis2, ptD, mult, nChg, vertexCollection);
     axis2 		= -std::log(axis2);
-
 //  qg 			= qglcalc->computeQGLikelihood(pt, eta, rho, {(float) mult, ptD, axis2});
-
-    deltaRAK8 = 9999;
-    ptAK8 = 0;
-    for(auto jetAK8 = jetsAK8->begin(); jetAK8 != jetsAK8->end(); ++jetAK8){
-      if(reco::deltaR(*jet, *jetAK8) < deltaRAK8){
-        deltaRAK8 = reco::deltaR(*jet, *jetAK8);
-        ptAK8 = jetAK8->pt()*(usePatJets? 1. : JECAK8->correction(*jet, iEvent, iSetup));
-      }
-    }
 
     ptDoubleCone = 0;
     for(auto pfCandidate = pfCandidates->begin(); pfCandidate != pfCandidates->end(); ++pfCandidate){
@@ -289,40 +250,35 @@ template <> edm::RefToBase<reco::Jet> qgMiniTuple::jetRef<edm::Handle<reco::PFJe
   return thisJetRef;
 }
 
+
 /*
  * Begin job: create vectors and set up tree
  */
 void qgMiniTuple::beginJob(){
   for(auto v : {&closebyJetdR, &closebyJetPt}) *v = new std::vector<float>();
-  for(auto v : {&closebyJetGenJetsInCone})     *v = new std::vector<int>();
 
   tree = fs->make<TTree>("qgMiniTuple","qgMiniTuple");
-  tree->Branch("nRun" ,			&nRun, 			"nRun/I");
-  tree->Branch("nLumi" ,		&nLumi, 		"nLumi/I");
-  tree->Branch("nEvent" ,		&nEvent, 		"nEvent/I");
-  tree->Branch("nPileUp",		&nPileUp, 		"nPileUp/I");
-  tree->Branch("nPriVtxs",		&nPriVtxs, 		"nPriVtxs/I");
-  tree->Branch("rho" ,			&rho, 			"rho/F");
-  tree->Branch("pt" ,			&pt,			"pt/F");
-  tree->Branch("eta",			&eta,			"eta/F");
-  tree->Branch("axis2",			&axis2,			"axis2/F");
-  tree->Branch("ptD",			&ptD,			"ptD/F");
-  tree->Branch("mult",			&mult,			"mult/I");
-  tree->Branch("nChg",			&nChg,			"nChg/I");
-  tree->Branch("bTag",			&bTag,			"bTag/F");
-  tree->Branch("partonId",		&partonId,		"partonId/I");
-  tree->Branch("jetIdLevel",		&jetIdLevel,		"jetIdLevel/I");
-  tree->Branch("nGenJetsInCone",	&nGenJetsInCone,	"nGenJetsInCone/I");
-  tree->Branch("matchedJet",		&matchedJet,		"matchedJet/O");
-  tree->Branch("balanced",		&balanced,		"balanced/O");
-  tree->Branch("deltaRAK8",		&deltaRAK8,		"deltaRAK8/F");
-  tree->Branch("ptAK8",			&ptAK8,			"ptAK8/F");
-  tree->Branch("ptDoubleCone",		&ptDoubleCone,		"ptDoubleCone/F");
-  tree->Branch("nGenJetsForGenParticle",&nGenJetsForGenParticle,"nGenJetsForGenParticle/I");
-  tree->Branch("nJetsForGenParticle",   &nJetsForGenParticle,   "nJetsForGenParticle/I");
-  tree->Branch("closebyJetdR",			"vector<float>",	&closebyJetdR);
-  tree->Branch("closebyJetPt",			"vector<float>",	&closebyJetPt);
-  tree->Branch("closebyJetGenJetsInCone",	"vector<int>",		&closebyJetGenJetsInCone);
+  tree->Branch("nEvent" ,			&nEvent, 			"nEvent/I");
+  tree->Branch("nPileUp",			&nPileUp, 			"nPileUp/I");
+  tree->Branch("nPriVtxs",			&nPriVtxs, 			"nPriVtxs/I");
+  tree->Branch("rho" ,				&rho, 				"rho/F");
+  tree->Branch("pt" ,				&pt,				"pt/F");
+  tree->Branch("eta",				&eta,				"eta/F");
+  tree->Branch("axis2",				&axis2,				"axis2/F");
+  tree->Branch("ptD",				&ptD,				"ptD/F");
+  tree->Branch("mult",				&mult,				"mult/I");
+  tree->Branch("nChg",				&nChg,				"nChg/I");
+  tree->Branch("bTag",				&bTag,				"bTag/F");
+  tree->Branch("partonId",			&partonId,			"partonId/I");
+  tree->Branch("jetIdLevel",			&jetIdLevel,			"jetIdLevel/I");
+  tree->Branch("nGenJetsInCone",		&nGenJetsInCone,		"nGenJetsInCone/I");
+  tree->Branch("matchedJet",			&matchedJet,			"matchedJet/O");
+  tree->Branch("balanced",			&balanced,			"balanced/O");
+  tree->Branch("ptDoubleCone",			&ptDoubleCone,			"ptDoubleCone/F");
+  tree->Branch("nGenJetsForGenParticle",	&nGenJetsForGenParticle,	"nGenJetsForGenParticle/I");
+  tree->Branch("nJetsForGenParticle",   	&nJetsForGenParticle,   	"nJetsForGenParticle/I");
+  tree->Branch("closebyJetdR",			"vector<float>",		&closebyJetdR);
+  tree->Branch("closebyJetPt",			"vector<float>",		&closebyJetPt);
 }
 
 
@@ -331,7 +287,6 @@ void qgMiniTuple::beginJob(){
  */
 void qgMiniTuple::endJob(){
  for(auto v : {closebyJetdR, closebyJetPt}) delete v;
- for(auto v : {closebyJetGenJetsInCone})    delete v;
 }
 
 

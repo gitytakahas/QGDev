@@ -50,7 +50,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void beginJob() override;
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       template <class jetClass> bool jetId(const jetClass *jet, bool tight = false, bool medium = false);
-      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, int& nChg_, edm::Handle<reco::VertexCollection> vC, float conesize = 999);
+      template <class jetClass> void calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, int& nChg_, edm::Handle<reco::VertexCollection> vC);
       template <class jetCollection, class candidateCollection> void analyzeEvent(const edm::Event& iEvent, const edm::EventSetup& iSetup, const jetCollection& jets, const jetCollection& jetsAK8, const candidateCollection& pfCandidates);
       template <class jetCollection> edm::RefToBase<reco::Jet> jetRef(const jetCollection& jets, typename jetCollection::element_type::const_iterator& jet);
       virtual void endJob() override;
@@ -84,8 +84,8 @@ class qgMiniTuple : public edm::EDAnalyzer{
       TTree *tree;
 //    QGLikelihoodCalculator *qglcalc;
 
-      float rho, pt, eta, axis2, axis2_dR2, axis2_dR3, ptD, ptD_dR2, ptD_dR3, bTag, deltaRAK8, ptAK8, ptDoubleCone;
-      int nRun, nLumi, nEvent, nPileUp, nPriVtxs, mult, mult_dR2, mult_dR3, nChg, nChg_dR2, nChg_dR3, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
+      float rho, pt, eta, axis2, ptD, bTag, deltaRAK8, ptAK8, ptDoubleCone;
+      int nRun, nLumi, nEvent, nPileUp, nPriVtxs, mult, nChg, partonId, partonFlavour, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle;
       bool matchedJet, balanced;
       std::vector<float> *closebyJetdR, *closebyJetPt;
       std::vector<int> *closebyJetGenJetsInCone;
@@ -266,11 +266,7 @@ template <class jetCollection, class candidateCollection> void qgMiniTuple::anal
     }
 
     calcVariables(&*jet, axis2,     ptD,     mult,     nChg,     vertexCollection);
-    calcVariables(&*jet, axis2_dR2, ptD_dR2, mult_dR2, nChg_dR2, vertexCollection, 0.2);
-    calcVariables(&*jet, axis2_dR3, ptD_dR3, mult_dR3, nChg_dR3, vertexCollection, 0.3);
     axis2 		= -std::log(axis2);
-    axis2_dR2 		= -std::log(axis2_dR2);
-    axis2_dR3 		= -std::log(axis2_dR3);
 
 //  qg 			= qglcalc->computeQGLikelihood(pt, eta, rho, {(float) mult, ptD, axis2});
 
@@ -319,17 +315,9 @@ void qgMiniTuple::beginJob(){
   tree->Branch("pt" ,			&pt,			"pt/F");
   tree->Branch("eta",			&eta,			"eta/F");
   tree->Branch("axis2",			&axis2,			"axis2/F");
-  tree->Branch("axis2_dR2",		&axis2_dR2,		"axis2_dR2/F");
-  tree->Branch("axis2_dR3",		&axis2_dR3,		"axis2_dR3/F");
   tree->Branch("ptD",			&ptD,			"ptD/F");
-  tree->Branch("ptD_dR2",		&ptD_dR2,		"ptD_dR2/F");
-  tree->Branch("ptD_dR3",		&ptD_dR3,		"ptD_dR3/F");
   tree->Branch("mult",			&mult,			"mult/I");
-  tree->Branch("mult_dR2",		&mult_dR2,		"mult_dR2/I");
-  tree->Branch("mult_dR3",		&mult_dR3,		"mult_dR3/I");
   tree->Branch("nChg",			&nChg,			"nChg/I");
-  tree->Branch("nChg_dR2",		&nChg_dR2,		"nChg_dR2/I");
-  tree->Branch("nChg_dR3",		&nChg_dR3,		"nChg_dR3/I");
   tree->Branch("bTag",			&bTag,			"bTag/F");
   tree->Branch("partonId",		&partonId,		"partonId/I");
   tree->Branch("partonFlavour",		&partonFlavour,		"partonFlavour/I");
@@ -360,7 +348,7 @@ void qgMiniTuple::endJob(){
 /*
  * Calculation for of axis2, ptD and mult (works both on reco and pat)
  */
-template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, int& nChg_, edm::Handle<reco::VertexCollection> vC, float coneSize){
+template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, float& axis2_, float& ptD_, int& mult_, int& nChg_, edm::Handle<reco::VertexCollection> vC){
   auto vtxLead = vC->begin();
 
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
@@ -368,13 +356,12 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
 
   //Loop over the jet constituents
   for(auto daughter = jet->begin(); daughter < jet->end(); ++daughter){
-    float dR 	 = reco::deltaR(*daughter, *jet);
     if(usePatJets){
       auto part = dynamic_cast<const pat::PackedCandidate*> (&*daughter);
       if(!part) continue;
       if(part->charge()){
         if(!(part->fromPV() > 1 && part->trackHighPurity())) continue;
-        else if(dR < coneSize) ++nChg_;
+        else ++nChg_;
       } else if(part->pt() < 1.0) continue;
     } else {
       auto part = dynamic_cast<const reco::PFCandidate*> (&*daughter);
@@ -386,7 +373,7 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
           if(fabs(itrk->dz(vtx->position())) < fabs(itrk->dz(vtxClose->position()))) vtxClose = vtx;
         }
         if(!(vtxClose == vtxLead && itrk->quality(reco::TrackBase::qualityByName("highPurity")))) continue;
-        else if(dR < coneSize) ++nChg_;
+        else ++nChg_;
       } else if(part->pt() < 1.0) continue;
     }
 
@@ -395,7 +382,6 @@ template <class jetClass> void qgMiniTuple::calcVariables(const jetClass *jet, f
     float partPt = daughter->pt();
     float weight = partPt*partPt;
 
-    if(dR > coneSize) continue;
     ++mult_;
 
     sum_weight 	 += weight;

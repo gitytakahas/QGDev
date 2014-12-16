@@ -4,7 +4,6 @@
 #include <map>
 #include <TFile.h>
 #include <TH1F.h>
-#include <TMatrixD.h>
 #include <TString.h>
 
 /*
@@ -13,7 +12,7 @@
 
 class QGLikelihoodCalculator{
   public:
-    QGLikelihoodCalculator(const TString& fileName, bool transform = false, bool boostMultiplicity_ = false);
+    QGLikelihoodCalculator(const TString& fileName, bool useWeights_ = false);
     ~QGLikelihoodCalculator();
     float computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars_);
     float computeQGLikelihoodCDF(float pt, float eta, float rho, std::vector<float> vars_);
@@ -25,12 +24,10 @@ class QGLikelihoodCalculator{
     bool isValidRange(float pt, float rho, float eta);
     bool getBinNumber(std::vector<float>& bins, float value, int& bin);
     bool getBinName(TString& binName, float eta, float pt, float rho);
-    std::vector<float> transformation(TString& binName, std::vector<float>& varTransform);
 
     std::vector<float> etaBins, ptBins, rhoBins;
     std::map<TString, TH1F*> pdfs; 
-    std::map<TString, TMatrixD*> varTransforms;
     TFile* f;
-    bool useTransformation, boostMultiplicity;
+    bool useWeights;
 };
 #endif

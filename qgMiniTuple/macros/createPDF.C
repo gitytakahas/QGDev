@@ -7,27 +7,20 @@
 #include "TCanvas.h"
 #include "TTree.h"
 #include "binClass.h"
-#include "treeLooper.h"
-#include "getTransform.h"
+#include "binningConfigurations.h"
+#include "treeLooper2.h"
 
 
 int main(int argc, char**argv){
-  bool fineBinning = true;
-  bool useDecorrelation = true;
+ for(bool fineBinning : {false}){
+
+  TString binning = "smallEtaBinning";
 
   // Define binning for pdfs
   binClass bins;
-  bins.setBinRange("eta", 	"#eta",		{0,1.3,1.5,2,2.5,3,4.7});
-  bins.setBinRange("pt" , 	"p_{T}",	bins.getBins(20, 20, 2000, true, {6500}));				// i.e. 20 bins from 20 to 2000 with log=true and with an additional bin up to 6500
-  bins.setBinRange("rho",	"#rho",		{0,9999});
-  bins.printBinRanges();
-
-  // Link some bins to be merged because of low statistics (for example higher pT bins at large eta)
-  for(int i=10; i < 21; ++i) bins.setLinks("eta5_pt9_rho0", {TString::Format("eta5_pt%d_rho0",i)});
-  for(int i=14; i < 21; ++i) bins.setLinks("eta4_pt13_rho0", {TString::Format("eta4_pt%d_rho0",i)});
-  for(int i=16; i < 21; ++i) bins.setLinks("eta3_pt15_rho0", {TString::Format("eta3_pt%d_rho0",i)});
-  for(int i=18; i < 21; ++i) bins.setLinks("eta2_pt17_rho0", {TString::Format("eta2_pt%d_rho0",i)});
-  for(int i=19; i < 21; ++i) bins.setLinks("eta1_pt18_rho0", {TString::Format("eta1_pt%d_rho0",i)});
+  if(binning == "defaultBinning") 		bins = getDefaultBinning();
+  if(binning == "8TeVBinning") 			bins = get8TeVBinning();
+  if(binning == "smallEtaBinning") 		bins = getSmallEtaBinning();
 
   // For different jet types (if _antib is added bTag is applied)
   for(TString jetType : {"AK4chs","AK4chs_antib"}){//,"AK5","AK5chs","AK7","AK7chs"}){
@@ -38,34 +31,6 @@ int main(int argc, char**argv){
     bins.setReference("eta", &t.eta);
     bins.setReference("rho", &t.rho);
 
-    std::map<TString, std::vector<std::vector<double>>> decorrelationMatrices;
-    if(useDecorrelation) decorrelationMatrices = getTransform(t, bins);
-
-    std::map<TString, std::vector<double>> minVar;
-    std::map<TString, std::vector<double>> maxVar;
-    if(useDecorrelation){
-      for(TString binName : bins.getAllBinNames()){
-        minVar[binName] = std::vector<double>(3, 9999);
-        maxVar[binName] = std::vector<double>(3, -9999);
-      }
-      while(t.next()){
-        if(!bins.update()) 	continue;										// Find bin and return false if outside ranges
-        if(t.jetIdLevel < 3) 	continue;										// Select tight jets
-        if(!t.matchedJet) 	continue; 										// Only matched jets
-        if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
-        if((fabs(t.partonId) > 3 && t.partonId != 21)) continue; 							// Keep only udsg
-        if(t.bTag) 		continue;										// Anti-b tagging (onluy if jetType.Contains("antib")
-        if(t.mult < 3)		continue;
-
-        std::vector<double> vars = {t.axis2, t.ptD, (double) t.mult};
-        std::vector<double> uncorrVars = decorrelate(decorrelationMatrices[bins.name], vars);
-        for(int i = 0; i < 3; ++i){
-          if(uncorrVars[i] < minVar[bins.name][i]) minVar[bins.name][i] = uncorrVars[i];
-          if(uncorrVars[i] > maxVar[bins.name][i]) maxVar[bins.name][i] = uncorrVars[i];
-        }
-      }
-    }
-
     // Creation of the pdfs
     std::map<TString, TH1D*> pdfs;
     for(TString binName : bins.getAllBinNames()){
@@ -74,13 +39,9 @@ int main(int argc, char**argv){
         pdfs["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, fineBinning ? 1000 : 200, 0, 8);
         pdfs["mult"  + histName] = new TH1D("mult"  + histName, "mult"  + histName, 140, 0.5, 140.5);
         pdfs["ptD"   + histName] = new TH1D("ptD"   + histName, "ptD"   + histName, fineBinning ? 1000 : 200, 0, 1);
-        if(useDecorrelation){
-          pdfs["var1" + histName] = new TH1D("var1" + histName, "var1" + histName, fineBinning ? 1000 : 200, minVar[binName][0]-0.01, maxVar[binName][0]+0.01);
-          pdfs["var2" + histName] = new TH1D("var2" + histName, "var2" + histName, fineBinning ? 1000 : 200, minVar[binName][1]-0.01, maxVar[binName][1]+0.01);
-          pdfs["var3" + histName] = new TH1D("var3" + histName, "var3" + histName, fineBinning ? 1000 : 200, minVar[binName][2]-0.01, maxVar[binName][2]+0.01);
-        }
       }
     }
+
 
     // Fill pdfs
     while(t.next()){
@@ -91,37 +52,22 @@ int main(int argc, char**argv){
       if((fabs(t.partonId) > 3 && t.partonId != 21)) continue; 								// Keep only udsg
       if(t.bTag) continue;												// Anti-b tagging (onluy if jetType.Contains("antib")
       if(!t.balanced) continue;												// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
+      if(binning == "8TeVBinning" && fabs(t.eta) > 2 && fabs(t.eta) < 3) continue;					// 8 TeV binning didn't use the intermediate
       TString type = (t.partonId == 21? "gluon" : "quark");								// Define q/g
       TString histName = "_" + type + "_" + bins.name;
 
       pdfs["axis2" + histName]->Fill(t.axis2);										// "axis2" already contains the log
       pdfs["mult"  + histName]->Fill(t.mult);
       pdfs["ptD"   + histName]->Fill(t.ptD);
-
-      if(useDecorrelation){
-        std::vector<double> vars = {t.axis2, t.ptD, (double) t.mult};
-        std::vector<double> uncorrVars = decorrelate(decorrelationMatrices[bins.name], vars); 
-        pdfs["var1" + histName]->Fill(uncorrVars[0]);
-        pdfs["var2" + histName]->Fill(uncorrVars[1]);
-        pdfs["var3" + histName]->Fill(uncorrVars[2]);
-      }
     }
 
     // Make file and write binnings
-    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV_testWithVarTransform.root","RECREATE");
+    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV_" + binning + ".root","RECREATE");
     pdfFile->cd();
     bins.writeBinsToFile();
 
-    if(useDecorrelation){
-      pdfFile->mkdir("decorrelationMatrices");
-      pdfFile->cd("decorrelationMatrices");
-      writeMatricesToFile(decorrelationMatrices, bins);
-      pdfFile->cd();
-    }
-
     // Write pdf's
     for(TString var : {"axis2","ptD","mult"}) pdfFile->mkdir(var);
-    if(useDecorrelation) for(TString var : {"var1","var2","var3"}) pdfFile->mkdir(var);
     for(auto& pdf : pdfs){
       for(TString var: {"axis2","ptD","mult","var1","var2","var3"}) if(pdf.first.Contains(var)) pdfFile->cd(var);
       if(pdf.second->GetEntries() == 0) std::cout << "Warning: no entries in " << pdf.first << std::endl;		// Give warning for empty pdfs
@@ -156,7 +102,6 @@ int main(int argc, char**argv){
         }
         if(emptyBins > maxEmptyBins) maxEmptyBins = emptyBins;
         if(maxEmptyBins > 24) std::cout << "This bin is really empty: " << pdf.first << std::endl;
-        else if(maxEmptyBins > 19){ pdf.second->Rebin(25); std::cout << "Rebinned (25): " << pdf.first << std::endl;}
         else if(maxEmptyBins > 9){  pdf.second->Rebin(20); std::cout << "Rebinned (20): " << pdf.first << std::endl;}
         else if(maxEmptyBins > 4){  pdf.second->Rebin(10); std::cout << "Rebinned (10): " << pdf.first << std::endl;}
         else if(maxEmptyBins > 3){  pdf.second->Rebin(5);  std::cout << "Rebinned (5): " << pdf.first << std::endl;}
@@ -168,7 +113,7 @@ int main(int argc, char**argv){
       pdf.second->Write();
 
       TString thisBin = pdf.first;
-      for(TString i : {"gluon","quark","axis2","mult","ptD","var1","var2","var3"}) thisBin.ReplaceAll(i + "_","");
+      for(TString i : {"gluon","quark","axis2","mult","ptD"}) thisBin.ReplaceAll(i + "_","");
       for(auto i : bins.getLinkedBins(thisBin)){									// Store copies for merged bins
         TString copyBin = pdf.first;
         copyBin.ReplaceAll(thisBin, i);
@@ -179,5 +124,6 @@ int main(int argc, char**argv){
     for(auto& pdf : pdfs) delete pdf.second;
     for(auto& file : {pdfFile}){ file->Close(); delete file;}
   }
-  return 0;
+ }
+ return 0;
 }

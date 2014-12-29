@@ -33,7 +33,8 @@ void makeProfile2D(TString xAndyVar, bool useBins = false, bool extraBinInformat
   std::vector<TString> jetTypes = {"AK4","AK4chs"};
 
   // Define binning for plots (i.e. separate plots for each bin)
-  binClass bins = getV1Binning();
+  binClass bins;
+  if(useBins) bins = getV1Binning();
 
   // Define x and y-axis variable and bins
   std::vector<float> xAxisBins, yAxisBins; TString xVar, yVar; bool xLog, yLog;

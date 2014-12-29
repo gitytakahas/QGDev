@@ -8,22 +8,23 @@
 #include "TTree.h"
 #include "binClass.h"
 #include "binningConfigurations.h"
-#include "treeLooper2.h"
+#include "treeLooper.h"
 
 
 int main(int argc, char**argv){
  for(bool fineBinning : {false}){
 
-  TString binning = "smallEtaBinning";
+  TString binning = "v1";
 
   // Define binning for pdfs
   binClass bins;
   if(binning == "defaultBinning") 		bins = getDefaultBinning();
   if(binning == "8TeVBinning") 			bins = get8TeVBinning();
   if(binning == "smallEtaBinning") 		bins = getSmallEtaBinning();
+  if(binning == "v1") 				bins = getV1Binning();
 
   // For different jet types (if _antib is added bTag is applied)
-  for(TString jetType : {"AK4chs","AK4chs_antib"}){//,"AK5","AK5chs","AK7","AK7chs"}){
+  for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){//,"AK5","AK5chs","AK7","AK7chs"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
     treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree
@@ -44,17 +45,18 @@ int main(int argc, char**argv){
 
 
     // Fill pdfs
+    TString binName;
     while(t.next()){
-      if(!bins.update()) 	continue;										// Find bin and return false if outside ranges 
-      if(t.jetIdLevel < 3) 	continue;										// Select tight jets
-      if(!t.matchedJet) 	continue; 										// Only matched jets
+      if(!bins.getBinName(binName)) 	continue;									// Find bin and return false if outside ranges
+      if(t.jetIdLevel < 3) 		continue;									// Select tight jets
+      if(!t.matchedJet) 	 	continue; 									// Only matched jets
       if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
       if((fabs(t.partonId) > 3 && t.partonId != 21)) continue; 								// Keep only udsg
       if(t.bTag) continue;												// Anti-b tagging (onluy if jetType.Contains("antib")
       if(!t.balanced) continue;												// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
       if(binning == "8TeVBinning" && fabs(t.eta) > 2 && fabs(t.eta) < 3) continue;					// 8 TeV binning didn't use the intermediate
       TString type = (t.partonId == 21? "gluon" : "quark");								// Define q/g
-      TString histName = "_" + type + "_" + bins.name;
+      TString histName = "_" + type + "_" + binName;
 
       pdfs["axis2" + histName]->Fill(t.axis2);										// "axis2" already contains the log
       pdfs["mult"  + histName]->Fill(t.mult);
@@ -62,9 +64,10 @@ int main(int argc, char**argv){
     }
 
     // Make file and write binnings
-    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV_" + binning + ".root","RECREATE");
+    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV_" + binning + "_newTest.root","RECREATE");
     pdfFile->cd();
     bins.writeBinsToFile();
+    bins.writeWeightsToFile(pdfFile);
 
     // Write pdf's
     for(TString var : {"axis2","ptD","mult"}) pdfFile->mkdir(var);
@@ -101,15 +104,16 @@ int main(int argc, char**argv){
           }
         }
         if(emptyBins > maxEmptyBins) maxEmptyBins = emptyBins;
-        if(maxEmptyBins > 24) std::cout << "This bin is really empty: " << pdf.first << std::endl;
-        else if(maxEmptyBins > 9){  pdf.second->Rebin(20); std::cout << "Rebinned (20): " << pdf.first << std::endl;}
-        else if(maxEmptyBins > 4){  pdf.second->Rebin(10); std::cout << "Rebinned (10): " << pdf.first << std::endl;}
-        else if(maxEmptyBins > 3){  pdf.second->Rebin(5);  std::cout << "Rebinned (5): " << pdf.first << std::endl;}
-        else if(maxEmptyBins > 1){  pdf.second->Rebin(4);  std::cout << "Rebinned (4): " << pdf.first << std::endl;}
-        else if(maxEmptyBins > 0){  pdf.second->Rebin(2);  std::cout << "Rebinned (2): " << pdf.first << std::endl;}
+        if(maxEmptyBins > 24) std::cout << "This bin is really empty: " << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;
+        else if(maxEmptyBins > 9){ pdf.second->Rebin(20); std::cout << "Rebinned (20): " << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
+        else if(maxEmptyBins > 4){ pdf.second->Rebin(10); std::cout << "Rebinned (10): " << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
+        else if(maxEmptyBins > 3){ pdf.second->Rebin(5);  std::cout << "Rebinned (5): "  << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
+        else if(maxEmptyBins > 1){ pdf.second->Rebin(4);  std::cout << "Rebinned (4): "  << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
+        else if(maxEmptyBins > 0){ pdf.second->Rebin(2);  std::cout << "Rebinned (2): "  << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
       }
 
       pdf.second->Scale(1./pdf.second->Integral(0, pdf.second->GetNbinsX() + 1));					// Scale to integral=1 (also include underflow/overflow)
+      pdf.second->SetTitle(pdf.first);
       pdf.second->Write();
 
       TString thisBin = pdf.first;

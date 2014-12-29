@@ -8,40 +8,47 @@
 #include "TCanvas.h"
 #include "TLegend.h"
 #include "binClass.h"
-#include "treeLooper2.h"
+#include "binningConfigurations.h"
+#include "treeLooper.h"
 #include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.h"
 #include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.cc"
 
+void setCorrectMinimum(TH2D* h){
+  bool first = true;
+  float minimum = 0;
+  for(int i = 0; i < h->GetSize(); ++i){
+    if(h->GetBinContent(i) == 0) continue;
+    if(first || h->GetBinContent(i) < minimum){
+      first = false;
+      minimum = h->GetBinContent(i);
+    }
+  }
+  h->SetMinimum(minimum*0.99);
+}
 
-int main(int argc, char**argv){
- for(bool useBins : {true, false}){
-  bool extraBinInformation = false;
 
+void makeProfile2D(TString xAndyVar, bool useBins = false, bool extraBinInformation = false){
   std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
-  std::vector<TString> jetTypes = {"AK4chs"};
+//std::vector<TString> files	= {"TTJets2"};
+  std::vector<TString> jetTypes = {"AK4","AK4chs"};
 
   // Define binning for plots (i.e. separate plots for each bin)
-  binClass bins;
-  if(useBins) bins.setBinRange("eta", 	"#eta",		{0,1.3,1.5,2,2.5,3,4.7});
-  if(useBins) bins.setBinRange("pt" , 	"p_{T}",	bins.getBins(20, 20, 2000, true, {6500}));				// i.e. 20 bins from 20 to 2000 with log=true and with an additional bin up to 6500
-  bins.printBinRanges();
-
-  // Link some bins to be merged because of low statistics (for example higher pT bins at large eta)
-  if(useBins){
-    for(int i=10; i < 21; ++i) bins.setLinks("eta5_pt9",  {TString::Format("eta5_pt%d",i)});
-    for(int i=14; i < 21; ++i) bins.setLinks("eta4_pt13", {TString::Format("eta4_pt%d",i)});
-    for(int i=16; i < 21; ++i) bins.setLinks("eta3_pt15", {TString::Format("eta3_pt%d",i)});
-    for(int i=18; i < 21; ++i) bins.setLinks("eta2_pt17", {TString::Format("eta2_pt%d",i)});
-    for(int i=19; i < 21; ++i) bins.setLinks("eta1_pt18", {TString::Format("eta1_pt%d",i)});
-  }
+  binClass bins = getV1Binning();
 
   // Define x and y-axis variable and bins
-//std::vector<float> xAxisBins	= bins.getBins(40, 0, 4, false, {4.2,4.4,4.7});		TString xVar = "#eta";		bool xLog = false;
-  std::vector<float> xAxisBins	= bins.getBins(8, 0, 40, false, {50});			TString xVar = "#rho";		bool xLog = false;
-//std::vector<float> yAxisBins	= bins.getBins(20, 20, 2000, true, {6500});		TString yVar = "p_{T}"; 	bool yLog = true;
-  std::vector<float> yAxisBins	= bins.getBins(10, 10, 70, false);			TString yVar = "nPileUp"; 	bool yLog = false;
-//std::vector<float> yAxisBins	= bins.getBins(10, 5, 55, false);			TString yVar = "nPriVtxs"; 	bool yLog = false;
-  TString xAndyVar = "rho_nPileUp";
+  std::vector<float> xAxisBins, yAxisBins; TString xVar, yVar; bool xLog, yLog;
+  if(xAndyVar.Contains("eta_")){ 			xAxisBins = bins.getBins(40, 0, 4, false, {4.2,4.4,4.7}); 	xVar = "#eta";					xLog = false;}
+  if(xAndyVar.Contains("rho_")){ 			xAxisBins = bins.getBins(8, 0, 40, false, {50});		xVar = "#rho";					xLog = false;}
+  if(xAndyVar.Contains("closebyJetsInCone_")){		xAxisBins = bins.getBins(9, -0.5, 8.5, false, {});		xVar = "N_{jets} within #DeltaR < 0.8";		xLog = false;}
+  if(xAndyVar.Contains("closebyJetsInCone10GeV_")){	xAxisBins = bins.getBins(9, -0.5, 8.5, false, {});		xVar = "N_{jets>10GeV} within #DeltaR < 0.8";	xLog = false;}
+  if(xAndyVar.Contains("deltaRmin_")){			xAxisBins = bins.getBins(6, 0.4, 0.7, false, {0.8, });		xVar = "#DeltaR_{min}";		 		xLog = false;}
+  if(xAndyVar.Contains("ratioDoubleCone_")){		xAxisBins = bins.getBins(17, 0.85, 2.55, false);		xVar = "p_{T}(doubleCone)/p_{T}";	 	xLog = false;}
+  if(xAndyVar.Contains("ptDoubleCone_")){		xAxisBins = bins.getBins(20, 20, 2000, true, {6500});		xVar = "p_{T}(doubleCone)"; 	 		xLog = true;}
+  if(xAndyVar.Contains("_eta")){ 			yAxisBins = bins.getBins(40, 0, 4, false, {4.2,4.4,4.7}); 	yVar = "#eta";					yLog = false;}
+  if(xAndyVar.Contains("_pt")){				yAxisBins = bins.getBins(20, 20, 2000, true, {6500});		yVar = "p_{T}"; 				yLog = true;}
+  if(xAndyVar.Contains("_nPileUp")){			yAxisBins = bins.getBins(10, 10, 70, false);			yVar = "nPileUp"; 				yLog = false;}
+  if(xAndyVar.Contains("_nPriVtxs")){			yAxisBins = bins.getBins(10, 5, 55, false);			yVar = "nPriVtxs"; 				yLog = false;}
+  if(xAndyVar.Contains("_ratioDoubleCone")){		yAxisBins = bins.getBins(20, 0.5, 2.5, false);			yVar = "p_{T}/p_{T}(doubleCone)"; 		yLog = false;}
 
   // Needed for 3D plots (which will be needed to get kurtosis and skewness)
   std::vector<float> axis2Bins	= bins.getBins(100, 0, 8, false);
@@ -63,17 +70,24 @@ int main(int argc, char**argv){
       treeLooper t(file, jetType);											// Init tree
       bins.setReference("pt",  &t.pt);
       bins.setReference("eta", &t.eta);
+      bins.setReference("rho", &t.rho);
 
       // Set x and y-axis variables
-//    float& xAxisVar 	= t.eta;
-//    float& yAxisVar 	= t.pt;
-      float& xAxisVar 	= t.rho;
-      int& yAxisVar 	= t.nPileUp;
-//    int& yAxisVar 	= t.nPriVtxs;
+      float& xAxisVar 	= (xAndyVar.Contains("eta_")?			t.eta :
+			  (xAndyVar.Contains("rho_")?			t.rho :
+			  (xAndyVar.Contains("closebyJetsInCone_")?	t.closebyJetsInCone :
+			  (xAndyVar.Contains("closebyJetsInCone10GeV_")?t.closebyJetsInCone10GeV :
+			  (xAndyVar.Contains("deltaRmin_")?		t.closestJetdR :
+			  (xAndyVar.Contains("ratioDoubleCone_")?	t.ratioDoubleCone : 
+			  (xAndyVar.Contains("ptDoubleCone_")?		t.ptDoubleCone : t.pt)))))));
+      float& yAxisVar 	= (xAndyVar.Contains("_eta")? 			t.eta :
+			  (xAndyVar.Contains("_pt")?			t.pt :
+			  (xAndyVar.Contains("_ratioDoubleCone")?	t.ratioDoubleCone : t.pt)));
+//    int& yAxisVar 	= (xAndyVar.Contains("_nPileUp"?		t.nPileUp : t.nPriVtxs));
 
       // Init local QGLikelihoodCalculator
-      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV.root");
-      QGLikelihoodCalculator localQG_cdf("../data/pdfQG_" + jetType + "_fineBinning_13TeV.root");
+      TString binning = "v1_newTest";
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_" + binning + ".root");
 
       // Creation of histos
       std::map<TString, TProfile2D*> plots;
@@ -84,31 +98,26 @@ int main(int argc, char**argv){
           plots["axis2"    + histName] = new TProfile2D("axis2"    + histName, "mean -log(#sigma_{2})",           xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray);
           plots["ptD"      + histName] = new TProfile2D("ptD"      + histName, "mean p_{T}D",                     xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray);
           plots["mult"     + histName] = new TProfile2D("mult"     + histName, "mean multiplicity",               xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray);
-          plots["nChg"     + histName] = new TProfile2D("nChg"     + histName, "mean charged multiplicity",       xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray);
-          plots["nNeutral" + histName] = new TProfile2D("nNeutral" + histName, "mean neutral multiplicity",       xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray);
           plots["qg"       + histName] = new TProfile2D("qg"       + histName, "mean quark-gluon likelihood",     xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray);
-          plots["cdf"      + histName] = new TProfile2D("cdf"      + histName, "mean quark-gluon CDF-likelihood", xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray);
           if(extraBinInformation){
             plots3D["axis2"    + histName] = new TH3D("axis2"    + histName + "3D", "-log(#sigma_{2})",           xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray, axis2Bins.size()-1, axis2BinsArray);
             plots3D["ptD"      + histName] = new TH3D("ptD"      + histName + "3D", "p_{T}D",                     xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray, otherBins.size()-1, otherBinsArray);
             plots3D["mult"     + histName] = new TH3D("mult"     + histName + "3D", "multiplicity",               xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray, multBins.size()-1, multBinsArray);
-            plots3D["nChg"     + histName] = new TH3D("nChg"     + histName + "3D", "charged multiplicity",       xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray, multBins.size()-1, multBinsArray);
-            plots3D["nNeutral" + histName] = new TH3D("nNeutral" + histName + "3D", "neutral multiplicity",       xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray, multBins.size()-1, multBinsArray);
             plots3D["qg"       + histName] = new TH3D("qg"       + histName + "3D", "quark-gluon likelihood",     xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray, otherBins.size()-1, otherBinsArray);
-            plots3D["cdf"      + histName] = new TH3D("cdf"      + histName + "3D", "quark-gluon CDF-likelihood", xAxisBins.size()-1, xAxisBinsArray, yAxisBins.size()-1, yAxisBinsArray, otherBins.size()-1, otherBinsArray);
           }
         }
       }
 
       // Fill histos
+      TString binName;
       while(t.next()){
-        if(!bins.update()) 		continue;									// Find bin and return false if outside ranges 
+        if(!bins.getBinName(binName)) 	continue;									// Find bin and return false if outside ranges 
         if(t.jetIdLevel < 3) 		continue;									// Select tight jets
-//      if(!t.matchedJet) 		continue; 									// Only matched jets
+        if(!t.matchedJet) 		continue; 									// Only matched jets
         if(t.bTag) 			continue;									// Anti-b tagging
         if(t.mult < 3 || t.axis2 > 99)	continue; 									// Take only jets with at least 3 particles
-//	if(!t.balanced) 		continue;									// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
-//      if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
+	if(!t.balanced) 		continue;									// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
+        if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
 
         TString type;
         if(t.partonId == 21) 	 	type = "gluon";
@@ -116,30 +125,23 @@ int main(int argc, char**argv){
         else continue;
 
         float qg = localQG.computeQGLikelihood(          t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2});
-        float qgcdf = localQG_cdf.computeQGLikelihoodCDF(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2});
 
-        TString histName = "_" + type + "_" + bins.name;
+        TString histName = "_" + type + "_" + binName;
         plots["axis2"    + histName]->Fill(xAxisVar, yAxisVar, t.axis2,    t.weight);
         plots["ptD"      + histName]->Fill(xAxisVar, yAxisVar, t.ptD,      t.weight);
         plots["mult"     + histName]->Fill(xAxisVar, yAxisVar, t.mult, 	   t.weight);
-        plots["nChg"     + histName]->Fill(xAxisVar, yAxisVar, t.nChg, 	   t.weight);
-        plots["nNeutral" + histName]->Fill(xAxisVar, yAxisVar, t.nNeutral, t.weight);
         plots["qg"       + histName]->Fill(xAxisVar, yAxisVar, qg,         t.weight);
-        plots["cdf"      + histName]->Fill(xAxisVar, yAxisVar, qgcdf,      t.weight);
         if(extraBinInformation){
           plots3D["axis2"    + histName]->Fill(xAxisVar, yAxisVar, t.axis2,    t.weight);
           plots3D["ptD"      + histName]->Fill(xAxisVar, yAxisVar, t.ptD,      t.weight);
           plots3D["mult"     + histName]->Fill(xAxisVar, yAxisVar, t.mult,     t.weight);
-          plots3D["nChg"     + histName]->Fill(xAxisVar, yAxisVar, t.nChg,     t.weight);
-          plots3D["nNeutral" + histName]->Fill(xAxisVar, yAxisVar, t.nNeutral, t.weight);
-          plots3D["qg"       + histName]->Fill(xAxisVar, yAxisVar, qg, 	      t.weight);
-          plots3D["cdf"      + histName]->Fill(xAxisVar, yAxisVar, qgcdf,     t.weight);
+          plots3D["qg"       + histName]->Fill(xAxisVar, yAxisVar, qg, 	       t.weight);
         }
       }
 
       // Stacking, cosmetics and saving
       for(auto& plot : plots){
-        TCanvas c;
+        TCanvas c(xAndyVar);
         if(xLog) c.SetLogx();
         if(yLog) c.SetLogy();
         
@@ -148,6 +150,17 @@ int main(int argc, char**argv){
         plot.second->SetTitle(TString(plot.second->GetTitle()) + " for " + type + "s;" + xVar + ";" + yVar);
         plot.second->SetStats(0);
         plot.second->SetContour(50);
+        setCorrectMinimum((TH2D*) plot.second);
+        if(plot.first.Contains("qg") || plot.first.Contains("ptD")){
+          plot.second->SetMinimum(0.);
+          plot.second->SetMaximum(1.);
+        } else if(plot.first.Contains("mult")){
+          plot.second->SetMinimum(0.);
+          plot.second->SetMaximum(50.);
+        } else if(plot.first.Contains("axis2")){
+          plot.second->SetMinimum(2.);
+          plot.second->SetMaximum(7.);
+        }
         plot.second->Draw("COLZ");
         c.Modified();
         bins.printInfoOnPlot(plot.first, jetType);
@@ -163,6 +176,7 @@ int main(int argc, char**argv){
           TH2D* rmsInBin = plot.second->ProjectionXY("RMS " + plot.first, "C=E");
           rmsInBin->SetTitle(TString(plot.second->GetTitle()).ReplaceAll("mean","RMS") + ";" + xVar + ";" + yVar);
           rmsInBin->SetStats(0);
+          setCorrectMinimum(rmsInBin);
           rmsInBin->SetContour(50);
           rmsInBin->Draw("COLZ");
           c.Modified();
@@ -186,12 +200,15 @@ int main(int argc, char**argv){
           kurtosisInBin->SetTitle(TString(plot.second->GetTitle()).ReplaceAll("mean","kurtosis"));
           skewnessInBin->SetTitle(TString(plot.second->GetTitle()).ReplaceAll("mean","skewness"));
 
+          setCorrectMinimum(kurtosisInBin);
           kurtosisInBin->Draw("COLZ");
           c.Modified();
           bins.printInfoOnPlot(plot.first, jetType);
           pdfName = pdfDir + plot.first + "_kurtosis.pdf";
           c.SaveAs(pdfName);
 
+          
+          setCorrectMinimum(skewnessInBin);
           skewnessInBin->Draw("COLZ");
           c.Modified();
           bins.printInfoOnPlot(plot.first, jetType);
@@ -208,6 +225,7 @@ int main(int argc, char**argv){
         entriesInBin->SetTitle("jets / bin for " + type + "s;" + xVar + ";" + yVar);
         entriesInBin->SetStats(0);
         entriesInBin->SetContour(50);
+        setCorrectMinimum(entriesInBin);
         entriesInBin->Draw("COLZ");
         c.Modified();
 
@@ -222,6 +240,11 @@ int main(int argc, char**argv){
       for(auto& plot : plots3D) delete plot.second;
     }
   }
- }
- return 0;
+}
+
+
+int main(int argc, char**argv){
+  if(argc == 1) return 1;
+  makeProfile2D(TString(argv[1]), false, false);
+  return 0;
 }

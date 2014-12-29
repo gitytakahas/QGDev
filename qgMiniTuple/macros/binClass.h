@@ -26,9 +26,9 @@ template <typename T> const bool contains(std::vector<T>& vec, const T& element)
  */
 class binClass{
   private:
-    std::vector<TString> 			valueNames;
-    std::map<TString, TString> 			valueDisplayNames;
-    std::map<TString, float*> 			valuePointers;
+    std::vector<TString> 			varNames;
+    std::map<TString, TString> 			varDisplayNames;
+    std::map<TString, float*> 			varPointers;
     std::map<TString, std::vector<float>> 	binRanges;
     std::map<TString, std::vector<TString>> 	linkedBins;
     std::map<TString, TString> 			masterBins;
@@ -41,8 +41,8 @@ class binClass{
     // Functions to define bins, store pointer to the variable related to the bins, merge bins, and set likelihood weights
     std::vector<float> 		getBins(int, float, float, bool, std::vector<float>);
     void 			setBinRange(TString, TString, std::vector<float>);
-    void 			setReference(TString, float*);
     void 			setLink(TString, TString);
+    void 			setReference(TString name, float* pointer){ 		 varPointers[name] = pointer;}
     void 			setWeights(TString binName, std::vector<float> weights){ varWeights[binName] = weights;}
 
     // Functions to retrieve all bin names, and the links between them 
@@ -72,22 +72,20 @@ class binClass{
  * Returns the names of all bins
  */
 std::vector<TString> binClass::getAllBinNames(bool alsoLinked = false){
-  std::vector<TString> allBinNames;
+  if(!varNames.size()) return std::vector<TString>(1, "nobins");
+
+  std::vector<TString> allBinNames = std::vector<TString>(1, "");
   std::vector<TString> baseNames;
-  if(valueNames.size() > 0){
-    for(int j = 0; j < binRanges[valueNames[0]].size() - 1; ++j) allBinNames.push_back(valueNames[0] + j);
-    for(int i = 1; i < valueNames.size(); ++i){
-      baseNames = allBinNames;
-      allBinNames.clear();
-      for(TString baseName : baseNames){
-        for(int j = 0; j < binRanges[valueNames[i]].size() - 1; ++j){
-          TString name = baseName + "_" + valueNames[i] + j;
-          if(alsoLinked || masterOfBin(name) == "") allBinNames.push_back(name);
-        }
+  for(TString& varName : varNames){
+    baseNames = allBinNames;
+    allBinNames.clear();
+    for(TString baseName : baseNames){
+      for(int j = 0; j < getNBins(varName); ++j){
+        TString name = baseName + (baseName == "" ? "" : "_") + varName + j;
+        if(alsoLinked || masterOfBin(name) == "") allBinNames.push_back(name);
       }
     }
   }
-  if(!allBinNames.size()) allBinNames.push_back("nobins");
   return allBinNames;
 }
 
@@ -112,10 +110,10 @@ std::vector<float> binClass::getBins(int nBins, float min, float max, bool log, 
 /* 
  * Gets the bin number for a variable
  */
-bool binClass::getBinNumber(std::vector<float>& bins, float* value, int& bin){
-  if(*value < bins.front() || *value > bins.back()) return false;
+bool binClass::getBinNumber(std::vector<float>& bins, float* var, int& bin){
+  if(*var < bins.front() || *var > bins.back()) return false;
   auto binUp = bins.begin() + 1;
-  while(*value > *binUp) ++binUp;
+  while(*var > *binUp) ++binUp;
   bin = binUp - bins.begin() - 1;
   return true;
 }
@@ -128,12 +126,12 @@ bool binClass::getBinNumber(std::vector<float>& bins, float* value, int& bin){
  */
 float binClass::getUpperEdge(TString binName, TString varName){ return getLowerEdge(binName, varName, true);}
 float binClass::getLowerEdge(TString binName, TString varName, bool upper = false){
+  if(!contains(varNames, varName)) return -1;
+
   TString sub = binName(binName.Index(TRegexp(varName+"[0-9]")) + varName.Length(), binName.Length());
   TString bin = sub.Contains('_')? sub(0, sub.Index('_')) : sub;
   int index = bin.Atoi() + (upper? 1 : 0);
-  auto it = std::find(valueNames.begin(), valueNames.end(), varName);
-  if(it == valueNames.end()) return -1;
-  else return binRanges[*it][index];
+  return binRanges[varName][index];
 }
 
 
@@ -143,17 +141,12 @@ float binClass::getLowerEdge(TString binName, TString varName, bool upper = fals
  * Bin initialization and merging functions
  */
 // Set bin ranges for variable
-void binClass::setBinRange(TString name, TString displayName, std::vector<float> varBinning){
-  valueNames.push_back(name);
-  valueDisplayNames[name] = displayName;
-  binRanges[name] = varBinning;
+void binClass::setBinRange(TString varName, TString displayName, std::vector<float> varBinning){
+  varNames.push_back(varName);												// The varNames vector keeps the order
+  varDisplayNames[varName] = displayName;
+  binRanges[varName]       = varBinning;
 }
 
-
-// Connects variable from tree
-void binClass::setReference(TString name, float* pointer){
-  valuePointers[name] = pointer;
-}
 
 
 // Redirects one bin to another, taking into account already existing links
@@ -185,12 +178,12 @@ void binClass::setLink(TString master, TString toBeLinked){
  * Redirects to master bin if we are dealing with a linked bin
  */
 bool binClass::getBinName(TString& binName){
-  binName = (valueNames.size()? "" : "nobins");
-  for(int i = 0; i < valueNames.size(); ++i){
-    if(!valuePointers.count(valueNames[i])){ std::cout << "No reference value for " << valueNames[i] << " binning!" << std::endl; exit(1);}
+  binName = (varNames.size()? "" : "nobins");
+  for(TString& varName : varNames){
+    if(!varPointers.count(varName)){ std::cout << "No reference var for " << varName << " binning!" << std::endl; exit(1);}
     int binNumber;
-    if(!getBinNumber(binRanges[valueNames[i]], valuePointers[valueNames[i]], binNumber)) return false;
-    binName += (i == 0 ? "" : "_") + valueNames[i] + binNumber;
+    if(!getBinNumber(binRanges[varName], varPointers[varName], binNumber)) return false;
+    binName += (binName == "" ? "" : "_") + varName + binNumber;
   }
   if(masterOfBin(binName) != "") binName = masterOfBin(binName);
   return true;
@@ -203,9 +196,9 @@ bool binClass::getBinName(TString& binName){
  */
 // Print out all the bin ranges
 void binClass::printBinRanges(){
-  for(int i = 0; i < valueNames.size(); ++i){
-    std::cout << "Binning for " << valueNames[i] << ": {";
-    for(float j : binRanges[valueNames[i]]) std::cout << j << ", "; std::cout << "\b\b}" << std::endl;
+  for(TString& varName : varNames){
+    std::cout << "Binning for " << varName << ": {";
+    for(float j : binRanges[varName]) std::cout << j << ", "; std::cout << "\b\b}" << std::endl;
   }
   std::cout << std::endl;
 }
@@ -213,9 +206,9 @@ void binClass::printBinRanges(){
 
 // Write bins to open ROOT file
 void binClass::writeBinsToFile(){
-  for(int i = 0; i < valueNames.size(); ++i){
-    TVectorT<float> tbins(binRanges[valueNames[i]].size(), binRanges[valueNames[i]].data());
-    tbins.Write(valueNames[i] + "Bins");
+  for(TString& varName : varNames){
+    TVectorT<float> tbins(binRanges[varName].size(), binRanges[varName].data());
+    tbins.Write(varName + "Bins");
   }
 }
 
@@ -240,12 +233,12 @@ void binClass::printInfoOnPlot(TString binName, TString jetType){
   t.SetTextAlign(31);
   t.SetTextSize(0.02);
   float height = 0.025;
-  if(valueNames.size() > 3){
-    height = 0.08/(float)valueNames.size();
-    t.SetTextSize(0.07/(float) valueNames.size());
+  if(varNames.size() > 3){
+    height = 0.08/(float)varNames.size();
+    t.SetTextSize(0.07/(float) varNames.size());
   }
-  for(int i = 0; i < valueNames.size(); ++i){
-    t.DrawLatex(0.9,0.91+i*height, TString::Format("%.2f < " + valueDisplayNames[valueNames[i]] + " < %.2f", getLowerEdge(binName, valueNames[i]), getUpperEdge(binName, valueNames[i])));
+  for(int i = 0; i < varNames.size(); ++i){
+    t.DrawLatex(0.9,0.91+i*height, TString::Format("%.2f < " + varDisplayNames[varNames[i]] + " < %.2f", getLowerEdge(binName, varNames[i]), getUpperEdge(binName, varNames[i])));
   }
   t.SetTextAlign(11);
   t.DrawLatex(0.1,0.91,  jetType);
@@ -254,14 +247,14 @@ void binClass::printInfoOnPlot(TString binName, TString jetType){
 
 // Construct latex loop containing \bin, \min and \max variables
 void binClass::makeTexLoops(){
-  for(int i = 0; i < valueNames.size(); ++i){
+  for(int i = 0; i < varNames.size(); ++i){
     ofstream output;
-    output.open((valueNames[i] + "Bins.tex").Data());
-    output << "\\foreach \\bin in {0,...," << binRanges[valueNames[i]].size() - 2 << "}{" << std::endl;
-    for(int j = 0; j < binRanges[valueNames[i]].size() - 1; ++j){
-      output << "  \\ifthenelse{\\equal{\\" + valueNames[i] + "bin}{" << i << "}}";
-      output << "{\\def\\" << valueNames[i] << "Min{" << binRanges[valueNames[i]][j] << "}";
-      output << "\\def\\" << valueNames[i] << "Max{" << binRanges[valueNames[i]][j+1] << "}}{}" << std::endl;
+    output.open((varNames[i] + "Bins.tex").Data());
+    output << "\\foreach \\bin in {0,...," << getNBins(varNames[i]) - 1 << "}{" << std::endl;
+    for(int j = 0; j < getNBins(varNames[i]); ++j){
+      output << "  \\ifthenelse{\\equal{\\" + varNames[i] + "bin}{" << i << "}}";
+      output << "{\\def\\" << varNames[i] << "Min{" << binRanges[varNames[i]][j] << "}";
+      output << "\\def\\" << varNames[i] << "Max{" << binRanges[varNames[i]][j+1] << "}}{}" << std::endl;
     }
     output << "}" << std::endl;
     output.close();

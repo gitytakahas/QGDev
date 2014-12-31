@@ -52,7 +52,7 @@ binClass getSmallEtaBinning(){
 
 
 
-binClass getV1Binning(){
+binClass getV1Binning(TString weightOption){
   binClass bins;
   bins.setBinRange("eta", 	"#eta",			{0,1.3,1.5,1.8,2.1,2.4,2.7,3,4.7});
   bins.setBinRange("pt" , 	"p_{T}",		bins.getBins(20, 20, 2000, true, {6500}));
@@ -66,11 +66,10 @@ binClass getV1Binning(){
       }
     }
   }
-  for(int j=5; j < bins.getNBins("eta"); ++j){												// Unfortunately, need to switch off rho binning in lowest pt bins of forward because of very low statistics
-    for(int i=0; i < 3; ++i){														// If we get a forward jets QCD sample, remove these lines, and the performance will be a lot better in these bins
-      for(int k=1; k < bins.getNBins("rho"); ++k){
-        bins.setLink(TString("eta") + j + "_pt" + i + "_rho0", TString("eta") + j + "_pt" + i + "_rho" + k);
-      }
+  for(int j=5; j < bins.getNBins("eta"); ++j){												// Unfortunately, need to merge some rho bins in lowest pt bins of forward because of very low statistics
+    for(int i=0; i < 3; ++i){														// If we get a forward jets QCD sample, try to go with finer binning, it could help a lot to boost performance
+      bins.setLink(TString("eta") + j + "_pt" + i + "_rho2", TString("eta") + j + "_pt" + i + "_rho3");
+      bins.setLink(TString("eta") + j + "_pt" + i + "_rho2", TString("eta") + j + "_pt" + i + "_rho4");
     }
   }
 
@@ -88,10 +87,24 @@ binClass getV1Binning(){
     }
   }
 
-
+/*
   for(int j=0; j < 5; ++j){														// Set weights in the central region, high pt
     for(int i=10; i < bins.getNBins("pt"); ++i) bins.setWeights(TString("eta") + j + "_pt" + i + "_rho0", {5./3.,2./3.,2./3.});
   }
+*/
 
+  for(int j=0; j < bins.getNBins("eta"); ++j){														// Set weights in the central region, high pt
+    for(int i=0; i < bins.getNBins("pt"); ++i){
+      for(int k=0; k < bins.getNBins("rho"); ++k){
+        if(weightOption == "a") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {1..,1..,1.});
+        if(weightOption == "b") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {3.5/3.,2.75/3.,2.75/3.});
+        if(weightOption == "c") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {4./3.,2.5/3.,2.5/3.});
+        if(weightOption == "d") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {4.5/3.,2.25/3.,2.25/3.});
+        if(weightOption == "e") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {5./3.,2./3.,2./3.});
+        if(weightOption == "f") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {5.5/3.,1.75/3.,1.75/3.});
+        if(weightOption == "g") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {6./3.,1.5/3.,1.5/3.});
+      }
+    }
+  }
   return bins;
 }

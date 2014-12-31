@@ -1,6 +1,7 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <iomanip>
 #include <cmath>
 #include "TFile.h"
 #include "TH1D.h"
@@ -10,8 +11,15 @@
 #include "binningConfigurations.h"
 #include "treeLooper.h"
 
+void rebin(TH1* hist, int rebinFactor){
+  hist->Rebin(rebinFactor);
+  std::cout << std::left << std::setw(20) << TString::Format("Rebinned (%d):", rebinFactor);
+  std::cout << std::left << std::setw(40) << hist->GetTitle() << "(entries: " << hist->GetEntries() << ")" << std::endl;
+}
+
 
 int main(int argc, char**argv){
+ for(TString weightOption : {"a","b","c","d","e","f","g"}){
  for(bool fineBinning : {false}){
 
   TString binning = "v1";
@@ -21,7 +29,8 @@ int main(int argc, char**argv){
   if(binning == "defaultBinning") 		bins = getDefaultBinning();
   if(binning == "8TeVBinning") 			bins = get8TeVBinning();
   if(binning == "smallEtaBinning") 		bins = getSmallEtaBinning();
-  if(binning == "v1") 				bins = getV1Binning();
+  if(binning == "v1") 				bins = getV1Binning(weightOption);
+  binning += weightOption;
 
   // For different jet types (if _antib is added bTag is applied)
   for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){//,"AK5","AK5chs","AK7","AK7chs"}){
@@ -104,12 +113,12 @@ int main(int argc, char**argv){
           }
         }
         if(emptyBins > maxEmptyBins) maxEmptyBins = emptyBins;
-        if(maxEmptyBins > 24) std::cout << "This bin is really empty: " << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;
-        else if(maxEmptyBins > 9){ pdf.second->Rebin(20); std::cout << "Rebinned (20): " << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
-        else if(maxEmptyBins > 4){ pdf.second->Rebin(10); std::cout << "Rebinned (10): " << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
-        else if(maxEmptyBins > 3){ pdf.second->Rebin(5);  std::cout << "Rebinned (5): "  << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
-        else if(maxEmptyBins > 1){ pdf.second->Rebin(4);  std::cout << "Rebinned (4): "  << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
-        else if(maxEmptyBins > 0){ pdf.second->Rebin(2);  std::cout << "Rebinned (2): "  << pdf.first << "\t(entries: " << pdf.second->GetEntries() << ")" << std::endl;}
+        if(maxEmptyBins > 19) std::cout << "This bin is really empty:" << std::endl;
+        if(maxEmptyBins > 9)      rebin(pdf.second, 20);
+        else if(maxEmptyBins > 4) rebin(pdf.second, 10);
+        else if(maxEmptyBins > 3) rebin(pdf.second, 5);
+        else if(maxEmptyBins > 1) rebin(pdf.second, 4);
+        else if(maxEmptyBins > 0) rebin(pdf.second, 2);
       }
 
       pdf.second->Scale(1./pdf.second->Integral(0, pdf.second->GetNbinsX() + 1));					// Scale to integral=1 (also include underflow/overflow)
@@ -128,6 +137,7 @@ int main(int argc, char**argv){
     for(auto& pdf : pdfs) delete pdf.second;
     for(auto& file : {pdfFile}){ file->Close(); delete file;}
   }
+ }
  }
  return 0;
 }

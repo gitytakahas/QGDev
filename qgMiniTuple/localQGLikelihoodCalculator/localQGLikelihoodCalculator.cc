@@ -16,19 +16,18 @@
 
 
 /// Constructor
-QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename, bool useWeights_){
-  if(filename == "" || !this->init(filename)) throw std::runtime_error(("Initialization failed: " + filename + " not found or corrupt!").Data());
-  useWeights = useWeights_;
+QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename, bool useWeights) : useWeights(useWeights){
+  if(filename == "" || !init(filename)) throw std::runtime_error(("Initialization failed: " + filename + " not found or corrupt!").Data());
 }
 
 
 /// Initialisation of the QGLikelihoodCalculator
 bool QGLikelihoodCalculator::init(const TString& fileName){
   f = new TFile(fileName);
-  if(f->IsZombie()) 					return false;
-  if(!(this->getBinsFromFile(etaBins, "etaBins")))	return false;
-  if(!(this->getBinsFromFile(ptBins,  "ptBins")))	return false;
-  if(!(this->getBinsFromFile(rhoBins, "rhoBins")))	return false;
+  if(f->IsZombie()) 				return false;
+  if(!getBinsFromFile(etaBins, "etaBins"))	return false;
+  if(!getBinsFromFile(ptBins,  "ptBins"))	return false;
+  if(!getBinsFromFile(rhoBins, "rhoBins"))	return false;
 
   TList *keys = f->GetListOfKeys();
   if(!keys) return false;
@@ -38,7 +37,14 @@ bool QGLikelihoodCalculator::init(const TString& fileName){
   while((keydir = (TKey*) nextdir())){
     if(!keydir->IsFolder()) continue;
     TDirectory *dir = (TDirectory*) keydir->ReadObj();
-    if(TString(dir->GetName()) != "decorrelationMatrices"){
+    if(TString(dir->GetName()) == "weights"){
+      TIter nextWeights(dir->GetListOfKeys());
+      TKey *keyWeights;
+      while((keyWeights = (TKey*) nextWeights())){
+        weights[keyWeights->GetName()] = std::vector<float>();
+        if(!getBinsFromFile(weights[keyWeights->GetName()], TString(dir->GetName()) + "/" + keyWeights->GetName())) return false;
+      }
+    } else if(TString(dir->GetName()) != "decorrelationMatrices"){
       TIter nexthist(dir->GetListOfKeys());
       TKey *keyhist;
       while((keyhist = (TKey*) nexthist())) pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj();
@@ -93,13 +99,8 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
       }
     }
     if(useWeights){
-      std::vector<double> powFactor;
-      if(pt > 150 && fabs(eta) < 2.5) powFactor = {5./3.,2/3.,2./3.};
-      else if(fabs(eta) < 3) powFactor = {4./3.,2.5/3.,2.5/3.};
-      else if(fabs(eta) > 3) powFactor = {2./3.,3.5/3.,3.5/3.};
-      else powFactor = {1.,1.,1.};
-      Q*=std::pow((double)Qi/Qw, powFactor[varIndex]);
-      G*=std::pow((double)Gi/Gw, powFactor[varIndex]);
+      Q*=std::pow(Qi/Qw, weights[binName][varIndex]);
+      G*=std::pow(Gi/Gw, weights[binName][varIndex]);
     } else {
       Q*=Qi/Qw;
       G*=Gi/Gw;
@@ -110,70 +111,6 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
   return Q/(Q+G);
 }
 
-
-/// Compute the QGLikelihood using CDF, given the pT, eta, rho and likelihood variables vector
-float QGLikelihoodCalculator::computeQGLikelihoodCDF(float pt, float eta, float rho, std::vector<float> vars){
-  if(!isValidRange(pt, rho, eta)) return -1;
-
-  TString binName;
-  if(!getBinName(binName, eta, pt, rho)) return -1;
-
-  float Q=1., G=1.;
-  for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
-    if(vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
-
-    auto quarkEntry = findEntry(binName, 0, varIndex);
-    auto gluonEntry = findEntry(binName, 1, varIndex);
-    if(!quarkEntry || !gluonEntry) return -2;
-
-    float cdfQuark = quarkEntry->Integral(0, quarkEntry->FindBin(vars[varIndex]));
-    float cdfGluon = gluonEntry->Integral(0, gluonEntry->FindBin(vars[varIndex]));
-
-    float ccdfQuark = 1.-cdfQuark;
-    float ccdfGluon = 1.-cdfGluon;
-
-    float Qi, Gi;
-    if(quarkEntry->GetMean() < gluonEntry->GetMean()){
-      if(cdfQuark+cdfGluon <= 0){
-        Qi = 0.999;
-        Gi = 0.001;
-      } else if(ccdfQuark+ccdfGluon <= 0){
-        Qi = 0.001;
-        Gi = 0.999;
-      } else {
-        Qi = cdfQuark/(cdfQuark+cdfGluon) - 0.5;
-        Gi = ccdfGluon/(ccdfQuark+ccdfGluon) - 0.5;
-      }
-    } else {
-      if(cdfQuark+cdfGluon <= 0){
-        Qi = 0.001;
-        Gi = 0.999;
-      } else if(ccdfQuark+ccdfGluon <= 0){
-        Qi = 0.999;
-        Gi = 0.001;
-      } else {
-        Qi = ccdfQuark/(ccdfQuark+ccdfGluon) - 0.5;
-        Gi = cdfGluon/(cdfQuark+cdfGluon) - 0.5;
-      }
-    }
-
-    if(useWeights){
-      std::vector<double> powFactor;
-      if(pt > 150 && fabs(eta) < 2.5) powFactor = {5./3.,2/3.,2./3.};
-      else if(fabs(eta) < 3) powFactor = {4./3.,2.5/3.,2.5/3.};
-      else if(fabs(eta) > 3) powFactor = {2./3.,3.5/3.,3.5/3.};
-      else powFactor = {1.,1.,1.};
-      Q*=std::pow((double)Qi, powFactor[varIndex]);
-      G*=std::pow((double)Gi, powFactor[varIndex]);
-    } else {
-      Q*=Qi;
-      G*=Gi;
-    }
-  }
-
-  if(Q+G <= 0) return 0.5;
-  return Q/(Q+G);
-}
 
 
 /// Find matching entry for a given eta, pt, rho, qgIndex and varIndex

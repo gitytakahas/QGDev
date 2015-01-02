@@ -52,7 +52,7 @@ binClass getSmallEtaBinning(){
 
 
 
-binClass getV1Binning(TString weightOption){
+binClass getV1Binning(TString weightOption = "a"){
   binClass bins;
   bins.setBinRange("eta", 	"#eta",			{0,1.3,1.5,1.8,2.1,2.4,2.7,3,4.7});
   bins.setBinRange("pt" , 	"p_{T}",		bins.getBins(20, 20, 2000, true, {6500}));
@@ -96,7 +96,7 @@ binClass getV1Binning(TString weightOption){
   for(int j=0; j < bins.getNBins("eta"); ++j){														// Set weights in the central region, high pt
     for(int i=0; i < bins.getNBins("pt"); ++i){
       for(int k=0; k < bins.getNBins("rho"); ++k){
-        if(weightOption == "a") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {1..,1..,1.});
+        if(weightOption == "a") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {1.,1.,1.});
         if(weightOption == "b") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {3.5/3.,2.75/3.,2.75/3.});
         if(weightOption == "c") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {4./3.,2.5/3.,2.5/3.});
         if(weightOption == "d") bins.setWeights(TString("eta") + j + "_pt" + i + "_rho" + k, {4.5/3.,2.25/3.,2.25/3.});

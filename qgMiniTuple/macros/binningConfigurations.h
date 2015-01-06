@@ -72,6 +72,9 @@ binClass getV1Binning(){
       bins.setLink(TString("eta") + j + "_pt" + i + "_rho2", TString("eta") + j + "_pt" + i + "_rho4");					// is again something which can be solved by more statistics
     }
   }
+  bins.setLink("eta5_pt13_rho3", "eta5_pt13_rho4");											// A couple of other low statistics bins
+  bins.setLink("eta6_pt3_rho3",  "eta6_pt3_rho4");
+  bins.setLink("eta6_pt12_rho3", "eta6_pt12_rho4");
 
   for(int j=0; j < bins.getNBins("rho"); ++j){
     for(int i=9;  i < bins.getNBins("pt"); ++i) bins.setLink(TString("eta7_pt8_rho")  + j, TString("eta7_pt") + i + "_rho" + j);	// Merge high pt bins in forward (no or low statistics)

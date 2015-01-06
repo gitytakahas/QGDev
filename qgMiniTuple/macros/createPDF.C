@@ -19,7 +19,6 @@ void rebin(TH1* hist, int rebinFactor){
 
 
 int main(int argc, char**argv){
- for(TString weightOption : {"a","b","c","d","e","f","g"}){
  for(bool fineBinning : {false}){
 
   TString binning = "v1";
@@ -29,11 +28,10 @@ int main(int argc, char**argv){
   if(binning == "defaultBinning") 		bins = getDefaultBinning();
   if(binning == "8TeVBinning") 			bins = get8TeVBinning();
   if(binning == "smallEtaBinning") 		bins = getSmallEtaBinning();
-  if(binning == "v1") 				bins = getV1Binning(weightOption);
-  binning += weightOption;
+  if(binning == "v1") 				bins = getV1Binning();
 
   // For different jet types (if _antib is added bTag is applied)
-  for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){//,"AK5","AK5chs","AK7","AK7chs"}){
+  for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
     treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree
@@ -81,7 +79,7 @@ int main(int argc, char**argv){
     // Write pdf's
     for(TString var : {"axis2","ptD","mult"}) pdfFile->mkdir(var);
     for(auto& pdf : pdfs){
-      for(TString var: {"axis2","ptD","mult","var1","var2","var3"}) if(pdf.first.Contains(var)) pdfFile->cd(var);
+      for(TString var: {"axis2","ptD","mult"}) if(pdf.first.Contains(var)) pdfFile->cd(var);
       if(pdf.second->GetEntries() == 0) std::cout << "Warning: no entries in " << pdf.first << std::endl;		// Give warning for empty pdfs
 
       if(!fineBinning){													// Try to make pdf more stable:
@@ -137,7 +135,6 @@ int main(int argc, char**argv){
     for(auto& pdf : pdfs) delete pdf.second;
     for(auto& file : {pdfFile}){ file->Close(); delete file;}
   }
- }
  }
  return 0;
 }

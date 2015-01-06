@@ -71,7 +71,7 @@ int main(int argc, char**argv){
     }
 
     // Make file and write binnings
-    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV_" + binning + "_newTest.root","RECREATE");
+    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + (fineBinning ? "_fineBinning":"") + "_13TeV_" + binning + ".root","RECREATE");
     pdfFile->cd();
     bins.writeBinsToFile();
     bins.writeWeightsToFile(pdfFile);

@@ -111,12 +111,12 @@ binClass getV1Binning(){
   //         it could be useful to re-check for the higher pt bins)
   for(int i=0; i < bins.getNBins("rho"); ++i){
     for(int k=0; k < 5; ++k){
-      for(int j=12; j < 21; ++j) bins.setWeights(TString("eta") + k + "pt" + j + "_rho" + i, {6./3.,1.5/3.,1.5/3.});			// Gets the likelihood ROC close enough to the multiplicity ROC (or even better in the lower bins), without taking over the discrete features of the multiplicity
-      for(int j=10; j < 12; ++j) bins.setWeights(TString("eta") + k + "pt" + j + "_rho" + i, {5.5/3.,1.75/3.,1.75/3.});
-      for(int j=8 ; j < 10; ++j) bins.setWeights(TString("eta") + k + "pt" + j + "_rho" + i, {5./3.,2./3.,2./3.});
-      for(int j=7 ; j < 8;  ++j) bins.setWeights(TString("eta") + k + "pt" + j + "_rho" + i, {4.5/3.,2.25/3.,2.25/3.});
-      for(int j=6 ; j < 7;  ++j) bins.setWeights(TString("eta") + k + "pt" + j + "_rho" + i, {4./3.,2.5/3.,2.5/3.});
-      for(int j=5 ; j < 6;  ++j) bins.setWeights(TString("eta") + k + "pt" + j + "_rho" + i, {3.5/3.,2.75/3.,2.75/3.});
+      for(int j=12; j < 21; ++j) bins.setWeights(TString("eta") + k + "_pt" + j + "_rho" + i, {6./3.,1.5/3.,1.5/3.});
+      for(int j=10; j < 12; ++j) bins.setWeights(TString("eta") + k + "_pt" + j + "_rho" + i, {5.5/3.,1.75/3.,1.75/3.});
+      for(int j=8 ; j < 10; ++j) bins.setWeights(TString("eta") + k + "_pt" + j + "_rho" + i, {5./3.,2./3.,2./3.});
+      for(int j=7 ; j < 8;  ++j) bins.setWeights(TString("eta") + k + "_pt" + j + "_rho" + i, {4.5/3.,2.25/3.,2.25/3.});
+      for(int j=6 ; j < 7;  ++j) bins.setWeights(TString("eta") + k + "_pt" + j + "_rho" + i, {4./3.,2.5/3.,2.5/3.});
+      for(int j=5 ; j < 6;  ++j) bins.setWeights(TString("eta") + k + "_pt" + j + "_rho" + i, {3.5/3.,2.75/3.,2.75/3.});
     }
   }
 

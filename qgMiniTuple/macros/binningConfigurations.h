@@ -90,11 +90,6 @@ binClass getV1Binning(){
     }
   }
 
-/*
-  for(int j=0; j < 5; ++j){														// Set weights in the central region, high pt
-    for(int i=10; i < bins.getNBins("pt"); ++i) bins.setWeights(TString("eta") + j + "_pt" + i + "_rho0", {5./3.,2./3.,2./3.});
-  }
-*/
   // The weights
   // The multiplicity is less correlated with the other two variables and has better discrimination power than those two at high pt
   // Therefore we give a higher weight to the multiplicity contribution to increase the performance

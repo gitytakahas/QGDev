@@ -26,19 +26,22 @@ class treeLooper{
     bool next();
     void setMaxEntries(int i){ maxEntries = i;};
  
-    float rho, pt, eta, axis2, ptD, bTagValue, weight; 
-    int nEvent, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle; 
+    float rho, pt, eta, axis2, ptD, bTagValue, ptDoubleCone, ratioDoubleCone, weight;
+    int nEvent, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle, nPriVtxs, nPileUp;
     bool balanced, matchedJet, bTag;
+    float closestJetdR, closestJetPt, closebyJetsInCone, closebyJetsInCone10GeV;
+    std::vector<float> *closebyJetdR, *closebyJetPt;
 };
 
 
 /*
  * Initialise tree with sample, jet type and (optional) location of tuples
  */
-treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTuple/"){
+treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTuple4/"){
   useBTagging = jetType.Contains("antib");
   jetType.ReplaceAll("_antib","");
-  qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
+  if(file.Contains("TTJets")) qgMiniTuple = new TChain("qgMiniTuple/qgMiniTuple");
+  else 			      qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
 
   usePtHatBins = (file == "QCD_AllPtBins");
   if(usePtHatBins){
@@ -62,9 +65,15 @@ treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = 
   qgMiniTuple->SetBranchAddress("jetIdLevel",			&jetIdLevel);
   qgMiniTuple->SetBranchAddress("balanced",			&balanced);
   qgMiniTuple->SetBranchAddress("matchedJet",			&matchedJet);
+  qgMiniTuple->SetBranchAddress("ptDoubleCone", 		&ptDoubleCone);
   qgMiniTuple->SetBranchAddress("nGenJetsInCone",		&nGenJetsInCone);
   qgMiniTuple->SetBranchAddress("nGenJetsForGenParticle",	&nGenJetsForGenParticle);
   qgMiniTuple->SetBranchAddress("nJetsForGenParticle",		&nJetsForGenParticle);
+
+  closebyJetdR = nullptr;
+  closebyJetPt = nullptr;
+  qgMiniTuple->SetBranchAddress("closebyJetdR",			&closebyJetdR);
+  qgMiniTuple->SetBranchAddress("closebyJetPt",			&closebyJetPt);
 
   eventNumber = 0;
   maxEntries = qgMiniTuple->GetEntries();
@@ -79,6 +88,16 @@ bool treeLooper::next(){
     qgMiniTuple->GetEntry(eventNumber++);
     eta = fabs(eta);
     bTag = (useBTagging && bTagValue > 0.244);
+    closebyJetsInCone = 0;
+    closebyJetsInCone10GeV = 0;
+    closestJetdR = 99999;
+    for(int i = 0; i < closebyJetdR->size(); ++i){
+      if(closebyJetdR->at(i) < 0.8) ++closebyJetsInCone;
+      if(closebyJetdR->at(i) < closestJetdR) closestJetdR = closebyJetdR->at(i);
+      if(closebyJetPt->at(i) < 10) continue;
+      if(closebyJetdR->at(i) < 0.8) ++closebyJetsInCone10GeV;
+    }
+    ratioDoubleCone = ptDoubleCone/pt;
     setWeight();
     return true;
   } else {

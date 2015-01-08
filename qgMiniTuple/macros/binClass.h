@@ -44,7 +44,7 @@ class binClass{
     void 			setLink(TString, TString);
     void 			setReference(TString name, float* pointer){ 		 varPointers[name] = pointer;}
     void 			setWeights(TString binName, std::vector<float> weights){ varWeights[binName] = weights;}
-    float 			getWeight(TString binName, int varIndex){ return varWeights[binName][varIndex];}
+    float 			getWeight(TString binName, int varIndex){ 		 return varWeights.count(binName)? varWeights[binName][varIndex] : 1.;};
 
     // Functions to retrieve all bin names, and the links between them 
     std::vector<TString> 	getAllBinNames(bool);

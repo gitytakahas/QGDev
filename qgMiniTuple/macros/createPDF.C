@@ -49,7 +49,7 @@ int main(int argc, char**argv){
       for(TString type : {"quark","gluon"}){
         TString histName = "_" + type + "_" + binName;
         pdfs["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, 200, 0, 8);
-        pdfs["mult"  + histName] = new TH1D("mult"  + histName, "mult"  + histName, 140, 0.5, 140.5);
+        pdfs["mult"  + histName] = new TH1D("mult"  + histName, "mult"  + histName, 140, 2.5, 142.5);
         pdfs["ptD"   + histName] = new TH1D("ptD"   + histName, "ptD"   + histName, 200, 0, 1);
       }
     }
@@ -66,7 +66,7 @@ int main(int argc, char**argv){
       if(t.bTag) 										continue;		// Anti-b tagging (onluy if jetType.Contains("antib")
       if(!t.balanced) 										continue;		// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
       if(binning == "8TeVBinning" && fabs(t.eta) > 2 && fabs(t.eta) < 3) 			continue;		// 8 TeV binning didn't use the intermediate
-      if(t.ptD <= 0 || t.axis2 > 15 || t.mult < 3)						continue;		// Avoid some extreme values
+      if(t.mult < 3)										continue;		// Avoid jets with less than 3 particles (passing our selection)
       TString type = (t.partonId == 21? "gluon" : "quark");								// Define q/g
       TString histName = "_" + type + "_" + binName;
 

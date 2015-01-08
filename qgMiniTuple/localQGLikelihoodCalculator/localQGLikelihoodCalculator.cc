@@ -70,19 +70,10 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
     if(!quarkEntry || !gluonEntry) return -2;
 
     int binQ = quarkEntry->FindBin(vars[varIndex]);
-    float Qi = quarkEntry->GetBinContent(binQ);
-
     int binG = gluonEntry->FindBin(vars[varIndex]);
-    float Gi = gluonEntry->GetBinContent(binG);
 
-    if(Qi <= 0 && Gi <= 0){
-      bool gluonAboveQuark = (quarkEntry->GetMean() < gluonEntry->GetMean());
-      if(vars[varIndex] < quarkEntry->GetMean()) if(gluonAboveQuark){ Qi = 0.999; Gi = 0.001;} else { Qi = 0.001; Gi = 0.999;}
-      else                                       if(gluonAboveQuark){ Qi = 0.001; Gi = 0.999;} else { Qi = 0.999; Gi = 0.001;}
-    }
-
-    Q*=Qi;
-    G*=Gi;;
+    Q *= quarkEntry->GetBinContent(binQ);
+    G *= gluonEntry->GetBinContent(binG);
   }
 
   if(Q==0) return 0;

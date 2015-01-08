@@ -75,8 +75,8 @@ class qgMiniTuple : public edm::EDAnalyzer{
       TTree 						*tree;
 //    QGLikelihoodCalculator 				*qglcalc;
 
-      float rho, pt, eta, axis2, ptD, bTag, ptDoubleCone, colorSingletMass;
-      int nEvent, nPileUp, nPriVtxs, mult, partonId, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle, colorSingletId;
+      float rho, pt, eta, axis2, ptD, bTag, ptDoubleCone, motherMass;
+      int nEvent, nPileUp, nPriVtxs, mult, partonId, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle, motherId;
       bool matchedJet, balanced;
       std::vector<float> *closebyJetdR, *closebyJetPt;
 
@@ -201,19 +201,19 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
       nJetsForGenParticle 	= countInCone(matchedGenParticle, jets);
       nGenJetsForGenParticle 	= countInCone(matchedGenParticle, genJets);
       if(matchedGenParticle->numberOfMothers() == 1){								//Very experimental, but first tests shows it's good at finding W's and t's
-        colorSingletId		= matchedGenParticle->mother()->pdgId();					//A bit more difficult for QCD, where it's sometimes a quark, decaying into
-        colorSingletMass	= matchedGenParticle->mother()->mass();						//quark+gluon, and sometimes just a proton with a lot of other QCD mess and 
+        motherId		= matchedGenParticle->mother()->pdgId();					//A bit more difficult for QCD, where it's sometimes a quark, decaying into
+        motherMass	= matchedGenParticle->mother()->mass();						//quark+gluon, and sometimes just a proton with a lot of other QCD mess and 
       } else {													//sometimes 2 mothers (mostly two quarks recoiling each other, but sometimes
-        colorSingletId		= 0;										//also two quarks going into two gluons etc...)
-        colorSingletMass	= 0;
+        motherId		= 0;										//also two quarks going into two gluons etc...)
+        motherMass	= 0;
       }
     } else {
       matchedJet 		= false;
       partonId 			= 0; 
       nJetsForGenParticle 	= 0;
       nGenJetsForGenParticle 	= 0;
-      colorSingletId		= 0;
-      colorSingletMass		= 0;
+      motherId		= 0;
+      motherMass		= 0;
     }
     if(!matchedJet) continue;
     nGenJetsInCone 		= countInCone(jet, genJets);
@@ -266,8 +266,8 @@ void qgMiniTuple::beginJob(){
   tree->Branch("mult",				&mult,				"mult/I");
   tree->Branch("bTag",				&bTag,				"bTag/F");
   tree->Branch("partonId",			&partonId,			"partonId/I");
-  tree->Branch("colorSingletId",		&colorSingletId,		"colorSingletId/I");
-  tree->Branch("colorSingletMass",		&colorSingletMass,		"colorSingletMass/F");
+  tree->Branch("motherId",			&motherId,			"motherId/I");
+  tree->Branch("motherMass",			&motherMass,			"motherMass/F");
   tree->Branch("jetIdLevel",			&jetIdLevel,			"jetIdLevel/I");
   tree->Branch("nGenJetsInCone",		&nGenJetsInCone,		"nGenJetsInCone/I");
   tree->Branch("matchedJet",			&matchedJet,			"matchedJet/O");

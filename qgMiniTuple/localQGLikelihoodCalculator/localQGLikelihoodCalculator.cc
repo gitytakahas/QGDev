@@ -71,40 +71,18 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
 
     int binQ = quarkEntry->FindBin(vars[varIndex]);
     float Qi = quarkEntry->GetBinContent(binQ);
-    float Qw = quarkEntry->GetBinWidth(binQ);
 
     int binG = gluonEntry->FindBin(vars[varIndex]);
     float Gi = gluonEntry->GetBinContent(binG);
-    float Gw = gluonEntry->GetBinWidth(binG);
 
-    if(Qi <= 0 || Gi <= 0){
+    if(Qi <= 0 && Gi <= 0){
       bool gluonAboveQuark = (quarkEntry->GetMean() < gluonEntry->GetMean());
+      if(vars[varIndex] < quarkEntry->GetMean()) if(gluonAboveQuark){ Qi = 0.999; Gi = 0.001;} else { Qi = 0.001; Gi = 0.999;}
+      else                                       if(gluonAboveQuark){ Qi = 0.001; Gi = 0.999;} else { Qi = 0.999; Gi = 0.001;}
+    }
 
-      if(quarkEntry->Integral(0, binQ) + gluonEntry->Integral(0, binG) <=0){
-        if(gluonAboveQuark){ Qi = 0.999; Gi = 0.001;} else { Qi = 0.001; Gi = 0.999;}
-      } else if(quarkEntry->Integral(binQ, quarkEntry->GetNbinsX() + 1) + gluonEntry->Integral(binG, gluonEntry->GetNbinsX() + 1) <=0){
-        if(gluonAboveQuark){ Qi = 0.001; Gi = 0.999;} else { Qi = 0.999; Gi = 0.001;}
-      } else {
-        int q = 1, g = 1;
-        while(Qi <= 0){
-          Qi += quarkEntry->GetBinContent(binQ+q) + quarkEntry->GetBinContent(binQ-q);
-          Qw += quarkEntry->GetBinWidth(binQ+q) + quarkEntry->GetBinWidth(binQ-q);
-          ++q;
-        }
-        while(Gi <= 0){
-          Gi += gluonEntry->GetBinContent(binG+g) + gluonEntry->GetBinContent(binG-g);
-          Gw += gluonEntry->GetBinWidth(binG+g) + gluonEntry->GetBinWidth(binG-g);
-          ++g;
-        }
-      }
-    }
-    if(useWeights){
-      Q*=std::pow(Qi/Qw, weights[binName][varIndex]);
-      G*=std::pow(Gi/Gw, weights[binName][varIndex]);
-    } else {
-      Q*=Qi/Qw;
-      G*=Gi/Gw;
-    }
+    Q*=Qi;
+    G*=Gi;;
   }
 
   if(Q==0) return 0;

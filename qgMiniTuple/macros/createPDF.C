@@ -21,14 +21,14 @@ void rebin(TH1* hist, int rebinFactor){
 int main(int argc, char**argv){
  for(bool fineBinning : {false}){
 
-  TString binning = "v1";
+  TString binning = "v1b";
 
   // Define binning for pdfs
   binClass bins;
   if(binning == "defaultBinning") 		bins = getDefaultBinning();
   if(binning == "8TeVBinning") 			bins = get8TeVBinning();
   if(binning == "smallEtaBinning") 		bins = getSmallEtaBinning();
-  if(binning == "v1") 				bins = getV1Binning();
+  if(binning == "v1b") 				bins = getV1Binning();
 
   // For different jet types (if _antib is added bTag is applied)
   for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){
@@ -121,10 +121,29 @@ int main(int argc, char**argv){
 
       pdf.second->Scale(1./pdf.second->Integral(0, pdf.second->GetNbinsX() + 1));					// Scale to integral=1 (also include underflow/overflow)
       pdf.second->SetTitle(pdf.first);
+
+      // Optimization (originally applied in QGLikelihoodCalculator.cc but more efficient to them already here):
+      // - replace binContent -> binContent/binWidth
+      // - if bin is empty, try to average out
+      // - apply the weight already here
+      TString thisBin = pdf.first(pdf.first.Index(TRegexp("eta")), pdf.first.Length());
+      TString thisVar = pdf.first(0, pdf.first.Index(TRegexp("_")));
+      TH1* temp = (TH1*) pdf.second->Clone();
+      for(int i = 0; i < pdf.second->GetNbinsX() + 1; ++i){
+        float content = temp->GetBinContent(i);
+        float width   = temp->GetBinWidth(i);
+        int j = 1;
+        while(content <= 0 && i-j > 0 && i+j <= pdf.second->GetNbinsX()){
+          content += temp->GetBinContent(i-j) + temp->GetBinContent(i+j);
+          width   += temp->GetBinWidth(i-j)   + temp->GetBinWidth(i+j);
+          ++j;
+        }
+        pdf.second->SetBinContent(i, std::pow(content/width, bins.getWeight(thisBin, (thisVar == "mult"? 0 : (thisVar == "axis2" ? 1 : 2 )))));
+      }
+      delete temp;
+
       pdf.second->Write();
 
-      TString thisBin = pdf.first;
-      for(TString i : {"gluon","quark","axis2","mult","ptD"}) thisBin.ReplaceAll(i + "_","");
       for(auto i : bins.getLinkedBins(thisBin)){									// Store copies for merged bins
         TString copyBin = pdf.first;
         copyBin.ReplaceAll(thisBin, i);

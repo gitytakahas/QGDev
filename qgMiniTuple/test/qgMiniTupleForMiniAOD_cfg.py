@@ -3,17 +3,12 @@ import glob
 
 process = cms.Process("qgMiniTupleProducer")
 
-files = glob.glob("/pnfs/iihe/cms/ph/sc4/store/mc/Spring14miniaod/TTJets_MSDecaysCKM_central_Tune4C_13TeV-madgraph-tauola/MINIAODSIM/PU20bx25_POSTLS170_V5-v1/00000/*")
-files = ["/store/mc/Spring14miniaod/TTJets_MSDecaysCKM_central_Tune4C_13TeV-madgraph-tauola/MINIAODSIM/PU20bx25_POSTLS170_V5-v1/00000/" + file.split('/')[-1] for file in files]
-
 # Settings for local tests
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 100
 process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(1000))
 process.source = cms.Source("PoolSource", 
-#    fileNames = cms.untracked.vstring('file:/user/tomc/public/TTJets_forSynch_1.root')
-    fileNames = cms.untracked.vstring(files),
-    skipEvents=cms.untracked.uint32(25000000)
+    fileNames = cms.untracked.vstring('/store/mc/Phys14DR/QCD_Pt-50to80_Tune4C_13TeV_pythia8/MINIAODSIM/AVE30BX50_tsg_castor_PHYS14_ST_V1-v1/00000/0C31D9A0-548B-E411-ABBB-0025905A60F4.root') # Test file available at T2B
 )
 
 # Standard configurations
@@ -21,16 +16,14 @@ process.load('Configuration.StandardSequences.Services_cff')
 
 # Use TFileService to put trees from different analyzers in one file
 process.TFileService = cms.Service("TFileService", 
-    fileName = cms.string("qgMiniTupleForMiniAOD.root"),
+    fileName = cms.string("qgMiniTuple.root"),
     closeFileFast = cms.untracked.bool(True)
 )
 
 
 process.qgMiniTuple = cms.EDAnalyzer("qgMiniTuple",
-    usePatJets			= cms.untracked.bool(True),
-    fileName 			= cms.untracked.string('qgMiniTuple.root'),
     rhoInputTag			= cms.InputTag('fixedGridRhoFastjetAll'),
-    csvInputTag			= cms.InputTag('combinedSecondaryVertexBJetTags'),
+    csvInputTag			= cms.InputTag('combinedInclusiveSecondaryVertexV2BJetTags'),
     vertexInputTag		= cms.InputTag('offlineSlimmedPrimaryVertices'),
     jetsInputTag		= cms.InputTag('slimmedJets'),
     genJetsInputTag		= cms.InputTag('slimmedGenJets'),

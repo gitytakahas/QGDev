@@ -37,7 +37,7 @@ int main(int argc, char**argv){
       bins.setReference("rho", &t.rho);
 
       // Init local localQGikelihoodCalculator
-      QGLikelihoodCalculator localQG(    "../data/pdfQG_" + jetType + "_13TeV_v1g_newTest.root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
 
       // Creation of histos
       std::map<TString, TH1D*> plots;

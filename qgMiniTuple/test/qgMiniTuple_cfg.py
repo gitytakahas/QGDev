@@ -34,10 +34,8 @@ process.myRecoPFJets = cms.Sequence(process.fixedGridRhoFastjetAll + process.pfN
                                     process.ak4GenJets + process.ak4PFJets + process.ak4PFJetsCHS
 )
 
-# Jet energy corrections
-process.load('QGDev.qgMiniTuple.correctionSources_cff')
+# Jet energy corrections and b-tagging
 process.load('JetMETCorrections.Configuration.DefaultJEC_cff')
-
 process.load('QGDev.qgMiniTuple.RecoBTagAK4_cff')
 process.load('QGDev.qgMiniTuple.RecoBTagAK4CHS_cff')
 

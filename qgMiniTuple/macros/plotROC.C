@@ -39,24 +39,18 @@ int main(int argc, char**argv){
       bins.setReference("rho", &t.rho);
 
       // Init local QGLikelihoodCalculator
-      QGLikelihoodCalculator localQGa("../data/pdfQG_" + jetType + "_13TeV_v1a_newTest.root");
-      QGLikelihoodCalculator localQGb("../data/pdfQG_" + jetType + "_13TeV_v1b_newTest.root");
-      QGLikelihoodCalculator localQGc("../data/pdfQG_" + jetType + "_13TeV_v1c_newTest.root");
-      QGLikelihoodCalculator localQGd("../data/pdfQG_" + jetType + "_13TeV_v1d_newTest.root");
-      QGLikelihoodCalculator localQGe("../data/pdfQG_" + jetType + "_13TeV_v1e_newTest.root");
-      QGLikelihoodCalculator localQGf("../data/pdfQG_" + jetType + "_13TeV_v1f_newTest.root");
-      QGLikelihoodCalculator localQGg("../data/pdfQG_" + jetType + "_13TeV_v1g_newTest.root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
 
       // Creation of histos
       std::map<TString, TH1D*> plots;
       for(TString binName : bins.getAllBinNames()){
         for(TString type : {"quark","gluon"}){
           TString histName = "_" + type + "_" + binName;
-          plots["axis2"  + histName] 	= new TH1D("axis2"  + histName, "axis2"     + histName, 1000, 0, 8);
-          plots["ptD"    + histName]	= new TH1D("ptD"    + histName, "ptD"       + histName, 1000, 0, 1);
-          plots["mult"   + histName]	= new TH1D("mult"   + histName, "mult"      + histName, 100, 0.5, 100.5);
-          for(TString var : {"qga","qgb","qgc","qgd","qge","qgf","qgg","axis2","ptD","mult"}){
-            plots[var + "_l" + histName] = new TH1D(var + "_l" + histName, var + "_l" + histName, 1000, -0.0001, 1.0001);
+          plots["axis2"  + histName] 	= new TH1D("axis2"  + histName, "axis2"     + histName, 200, 0, 8);
+          plots["ptD"    + histName]	= new TH1D("ptD"    + histName, "ptD"       + histName, 200, 0, 1);
+          plots["mult"   + histName]	= new TH1D("mult"   + histName, "mult"      + histName, 140, 2.5, 142.5);
+          for(TString var : {"qg","axis2","ptD","mult"}){
+            plots[var + "_l" + histName] = new TH1D(var + "_l" + histName, var + "_l" + histName, 100, -0.0001, 1.0001);
           }
         }
       }
@@ -81,13 +75,7 @@ int main(int argc, char**argv){
         plots["axis2"   + histName]->Fill(t.axis2, 										t.weight);
         plots["ptD"     + histName]->Fill(t.ptD, 										t.weight);
         plots["mult"    + histName]->Fill(t.mult, 										t.weight);
-        plots["qga_l"   + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
-        plots["qgb_l"   + histName]->Fill(localQGb.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
-        plots["qgc_l"   + histName]->Fill(localQGc.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
-        plots["qgd_l"   + histName]->Fill(localQGd.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
-        plots["qge_l"   + histName]->Fill(localQGe.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
-        plots["qgf_l"   + histName]->Fill(localQGf.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
-        plots["qgg_l"   + histName]->Fill(localQGg.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
+        plots["qg_l"    + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
         plots["axis2_l" + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {-1, -1, t.axis2}), 			t.weight);
         plots["ptD_l"   + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {-1, t.ptD}), 			t.weight);
         plots["mult_l"  + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult}), 			t.weight);
@@ -96,7 +84,7 @@ int main(int argc, char**argv){
 
       // Stacking, cosmetics and saving
       for(auto& plot : plots){
-        if(!plot.first.Contains("gluon") || !plot.first.Contains("qga_l") || plot.second->GetEntries() == 0) continue;
+        if(!plot.first.Contains("gluon") || !plot.first.Contains("qg_l") || plot.second->GetEntries() == 0) continue;
         TCanvas c;
 
         TLegend l(0.12,0.2,0.4,0.5);
@@ -104,7 +92,7 @@ int main(int argc, char**argv){
         l.SetBorderSize(0);
 
         std::map<TString, TGraph*> roc;
-        for(TString var : {"qga","qgb","qgc","qgd","qge","qgf","qgg","axis2","ptD","mult"}){
+        for(TString var : {"qg","axis2","ptD","mult"}){
           for(TString type : {"_l",""}){
             if(var.Contains("qg") && type == "") continue;
 
@@ -122,15 +110,8 @@ int main(int argc, char**argv){
             if(var == "axis2")		roc[var+type]->SetLineColor(type == "_l" ? kGreen+4   : kYellow);
             if(var == "ptD")		roc[var+type]->SetLineColor(type == "_l" ? kMagenta+4 : kAzure+10);
             if(var == "mult")		roc[var+type]->SetLineColor(type == "_l" ? kRed :       kOrange);
-            if(var == "qga")		roc[var+type]->SetLineColor(kBlack);
-            if(var == "qga")		roc[var+type]->SetLineColor(kGray+1);
-            if(var == "qgb")		roc[var+type]->SetLineColor(30);
-            if(var == "qgc")		roc[var+type]->SetLineColor(3);
-            if(var == "qgd")		roc[var+type]->SetLineColor(46);
-            if(var == "qge")		roc[var+type]->SetLineColor(39);
-            if(var == "qgf")		roc[var+type]->SetLineColor(42);
-            if(var == "qgg")		roc[var+type]->SetLineColor(28);
-            roc[var+type]->SetLineWidth(type == "_l" ? 1 : 0.5);
+            if(var == "qg")		roc[var+type]->SetLineColor(kBlack);
+            roc[var+type]->SetLineWidth(type == "_l" ? 3. : 1.);
             roc[var+type]->SetLineStyle(type == "" ? 3 : 1);
 
 
@@ -139,13 +120,6 @@ int main(int argc, char**argv){
             if(var == "ptD") 	entryName = "p_{T}D";
             if(var == "mult") 	entryName = "multiplicity";
             if(type == "_l")	entryName += " likelihood";
-            if(var == "qga")	entryName += " (a)";
-            if(var == "qgb")	entryName += " (b)";
-            if(var == "qgc")	entryName += " (c)";
-            if(var == "qgd")	entryName += " (d)";
-            if(var == "qge")	entryName += " (e)";
-            if(var == "qgf")	entryName += " (f)";
-            if(var == "qgg")	entryName += " (g)";
             l.AddEntry(roc[var+type], entryName, "l");
 
             if(roc.size() == 1){

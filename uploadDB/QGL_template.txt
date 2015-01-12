@@ -1,0 +1,12 @@
+{
+    "destinationDatabase": "DATABASE",
+    "destinationTags": {
+        "TAGNAME": {
+            "dependencies": {},
+            "synchronizeTo": "offline"
+        }
+    },
+    "inputTag": "TAGNAME",
+    "since": null,
+    "userText": ""
+}

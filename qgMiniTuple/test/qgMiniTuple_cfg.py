@@ -16,7 +16,7 @@ process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 process.load("Configuration.StandardSequences.MagneticField_cff")
 process.load('Configuration.StandardSequences.GeometryExtended_cff')
 process.load("Configuration.Geometry.GeometryIdeal_cff")
-process.GlobalTag.globaltag = 'PHYS14_50_V1::All'
+process.GlobalTag.globaltag = 'PHYS14_25_V1::All'
 
 # Use TFileService to put trees from different analyzers in one file
 process.TFileService = cms.Service("TFileService", 

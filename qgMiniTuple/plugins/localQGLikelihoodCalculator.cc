@@ -1,1 +1,0 @@
-../localQGLikelihoodCalculator/localQGLikelihoodCalculator.cc

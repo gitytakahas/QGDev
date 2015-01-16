@@ -26,7 +26,7 @@ TString switchQG(TString inputBin){
 int main(int argc, char**argv){
   TString binning = "v1";
 
-  // Define binning for pdfs
+  // Define binning for pdfs (details in binninConfigurations.h)
   binClass bins;
   if(binning == "defaultBinning") 		bins = getDefaultBinning();
   if(binning == "8TeVBinning") 			bins = get8TeVBinning();
@@ -37,8 +37,8 @@ int main(int argc, char**argv){
   for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
-    treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree
-    bins.setReference("pt",  &t.pt);
+    treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree (third argument is the directory path, if other than default in treeLooper.h)
+    bins.setReference("pt",  &t.pt);											// Give the binning class a pointer to the variables used to bin in
     bins.setReference("eta", &t.eta);
     bins.setReference("rho", &t.rho);
 
@@ -63,10 +63,10 @@ int main(int argc, char**argv){
       if(!t.matchedJet) 								 	continue; 		// Only matched jets
       if(t.nGenJetsInCone != 1 || t.nJetsForGenParticle != 1 || t.nGenJetsForGenParticle != 1) 	continue;		// Use only jets matched to exactly one gen jet and gen particle, and no other jet candidates
       if((fabs(t.partonId) > 3 && t.partonId != 21)) 						continue; 		// Keep only udsg
-      if(t.bTag) 										continue;		// Anti-b tagging (onluy if jetType.Contains("antib")
-      if(!t.balanced) 										continue;		// Take only two leading jets with pt3 < 0.15*(pt1+pt2)
+      if(t.bTag) 										continue;		// Anti-b tagging (always false if jetType does not contain "antib")
+      if(!t.balanced) 										continue;		// Take only two leading jets with pt3 < 0.15*(pt1+pt2)  (surpresses small radiated jets with pt <<< pthat)
       if(binning == "8TeVBinning" && fabs(t.eta) > 2 && fabs(t.eta) < 3) 			continue;		// 8 TeV binning didn't use the intermediate
-      if(t.mult < 3)										continue;		// Avoid jets with less than 3 particles (passing our selection)
+      if(t.mult < 3)										continue;		// Avoid jets with less than 3 particles (otherwise axis2=0)
       TString type = (t.partonId == 21? "gluon" : "quark");								// Define q/g
       TString histName = "_" + type + "_" + binName;
 
@@ -172,7 +172,6 @@ int main(int argc, char**argv){
     TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + "_13TeV_" + binning + ".root","RECREATE");
     pdfFile->cd();
     bins.writeBinsToFile();
-    bins.writeWeightsToFile(pdfFile);
 
     // Write to file
     for(TString var : {"axis2","ptD","mult"}) pdfFile->mkdir(var);

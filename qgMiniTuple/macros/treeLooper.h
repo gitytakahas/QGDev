@@ -26,8 +26,8 @@ class treeLooper{
     bool next();
     void setMaxEntries(int i){ maxEntries = i;};
  
-    float rho, pt, eta, axis2, ptD, bTagValue, ptDoubleCone, ratioDoubleCone, weight;
-    int nEvent, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle, nPriVtxs, nPileUp;
+    float rho, pt, eta, axis2, ptD, bTagValue, ptDoubleCone, ratioDoubleCone, weight, motherMass;
+    int nEvent, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle, nPriVtxs, nPileUp, motherId;
     bool balanced, matchedJet, bTag;
     float closestJetdR, closestJetPt, closebyJetsInCone, closebyJetsInCone10GeV;
     std::vector<float> *closebyJetdR, *closebyJetPt;
@@ -40,8 +40,8 @@ class treeLooper{
 treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTuple4/"){
   useBTagging = jetType.Contains("antib");
   jetType.ReplaceAll("_antib","");
-  if(file.Contains("TTJets")) qgMiniTuple = new TChain("qgMiniTuple/qgMiniTuple");
-  else 			      qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
+
+  qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
 
   usePtHatBins = (file == "QCD_AllPtBins");
   if(usePtHatBins){
@@ -61,6 +61,8 @@ treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = 
   qgMiniTuple->SetBranchAddress("ptD", 				&ptD);
   qgMiniTuple->SetBranchAddress("mult",	 			&mult);
   qgMiniTuple->SetBranchAddress("partonId", 			&partonId);
+  qgMiniTuple->SetBranchAddress("motherId", 			&motherId);
+  qgMiniTuple->SetBranchAddress("motherMass", 			&motherMass);
   qgMiniTuple->SetBranchAddress("bTag", 			&bTagValue);
   qgMiniTuple->SetBranchAddress("jetIdLevel",			&jetIdLevel);
   qgMiniTuple->SetBranchAddress("balanced",			&balanced);

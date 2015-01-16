@@ -62,7 +62,6 @@ class binClass{
     void 			printBinRanges(); 
     void 			printInfoOnPlot(TString, TString);
     void 			writeBinsToFile();
-    void 			writeWeightsToFile(TFile *file);
     void 			makeTexLoops();
 };
 
@@ -211,19 +210,6 @@ void binClass::writeBinsToFile(){
     TVectorT<float> tbins(binRanges[varName].size(), binRanges[varName].data());
     tbins.Write(varName + "Bins");
   }
-}
-
-
-// Write weights to open ROOT file
-void binClass::writeWeightsToFile(TFile *file){
-  file->mkdir("weights");
-  file->cd("weights");
-  for(TString bin : getAllBinNames(true)){
-    if(!varWeights.count(bin)) varWeights[bin] = {1.,1.,1.};
-    TVectorT<float> tweights(varWeights[bin].size(), varWeights[bin].data());
-    tweights.Write(bin);
-  }
-  file->cd();
 }
 
 

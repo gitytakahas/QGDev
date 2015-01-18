@@ -32,7 +32,6 @@
 #include "DataFormats/Math/interface/deltaR.h"
 #include "JetMETCorrections/Objects/interface/JetCorrector.h"
 
-#include "localQGLikelihoodCalculator.h"
 #include "TFile.h"
 #include "TTree.h"
 

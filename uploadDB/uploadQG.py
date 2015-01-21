@@ -40,8 +40,12 @@ print
 uploadScript = os.path.abspath('upload.py')
 for tag in tags :
   shutil.copy(options.file, tag + '.db')
-  if options.offline: subprocess.call( [uploadScript, tag + '.db', '--backend', 'offline'])
-  else:               subprocess.call( [uploadScript, tag + '.db'])
+  try:
+    if options.offline: print subprocess.check_output( [uploadScript, tag + '.db', '--backend', 'offline'], stderr=subprocess.STDOUT)
+    else:               print subprocess.check_output( [uploadScript, tag + '.db'], stderr=subprocess.STDOUT)
+  except subprocess.CalledProcessError as e:
+    print e.output
+    exit(1)
 
 # Clean up
 for tag in tags :

@@ -3,7 +3,7 @@
 import os
 import shutil
 import subprocess
-import urllib
+import time
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -49,5 +49,6 @@ for tag in tags :
 
 # Clean up
 for tag in tags :
+  time.sleep(5)
   os.remove(tag + '.db')
   os.remove(tag + '.txt')

@@ -2,9 +2,9 @@
 
 version=$1
 
-echo "Payloads in QGL_$version.db:"
-payloads="$(cmscond_list_iov -c sqlite_file:QGL_$version.db -a)"
+echo "Payloads in $version:"
+payloads="$(cmscond_list_iov -c sqlite_file:$version -a)"
 for payload in $payloads; do
   echo
-  cmscond_list_iov -c sqlite_file:QGL_$version.db -t $payload
+  cmscond_list_iov -c sqlite_file:$version -t $payload
 done

@@ -30,25 +30,23 @@ print 'Tags in ' + options.file + ':'
 # Preparing JSON files
 for tag in tags:
   print tag
-  templateFile = open('QGL_template.txt', 'r')
-  outputFile   = open(tag + '.txt', 'w')
-  contents     = templateFile.read().replace('TAGNAME', tag).replace('DATABASE',database)
-  outputFile.write(contents)
+  with open('QGL_template.txt', 'r') as templateFile:
+    with open(tag + '.txt', 'w') as outputFile:
+      contents     = templateFile.read().replace('TAGNAME', tag).replace('DATABASE',database)
+      outputFile.write(contents)
 print
 
 # Uploading
 uploadScript = os.path.abspath('upload.py')
-for tag in tags :
+for tag in tags:
   shutil.copy(options.file, tag + '.db')
   try:
     if options.offline: print subprocess.check_output( [uploadScript, tag + '.db', '--backend', 'offline'], stderr=subprocess.STDOUT)
     else:               print subprocess.check_output( [uploadScript, tag + '.db'], stderr=subprocess.STDOUT)
   except subprocess.CalledProcessError as e:
     print e.output
-    exit(1)
 
 # Clean up
 for tag in tags :
-  time.sleep(5)
   os.remove(tag + '.db')
   os.remove(tag + '.txt')

@@ -29,7 +29,7 @@ class treeLooper{
     float rho, pt, eta, axis2, ptD, bTagValue, ptDoubleCone, ratioDoubleCone, weight, motherMass;
     int nEvent, mult, partonId, jetIdLevel, nGenJetsInCone, nJetsForGenParticle, nGenJetsForGenParticle, nPriVtxs, nPileUp, motherId;
     bool balanced, matchedJet, bTag;
-    float closestJetdR, closestJetPt, closebyJetsInCone, closebyJetsInCone10GeV;
+    float additionalJets;
     std::vector<float> *closebyJetdR, *closebyJetPt;
 };
 
@@ -41,7 +41,8 @@ treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = 
   useBTagging = jetType.Contains("antib");
   jetType.ReplaceAll("_antib","");
 
-  qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
+  if(file == "TTJets" || file.Contains("VBFHbb")) qgMiniTuple = new TChain("qgMiniTuple/qgMiniTuple");
+  else qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
 
   usePtHatBins = (file == "QCD_AllPtBins");
   if(usePtHatBins){
@@ -90,14 +91,10 @@ bool treeLooper::next(){
     qgMiniTuple->GetEntry(eventNumber++);
     eta = fabs(eta);
     bTag = (useBTagging && bTagValue > 0.244);
-    closebyJetsInCone = 0;
-    closebyJetsInCone10GeV = 0;
-    closestJetdR = 99999;
+    additionalJets = 0;
     for(int i = 0; i < closebyJetdR->size(); ++i){
-      if(closebyJetdR->at(i) < 0.8) ++closebyJetsInCone;
-      if(closebyJetdR->at(i) < closestJetdR) closestJetdR = closebyJetdR->at(i);
-      if(closebyJetPt->at(i) < 10) continue;
-      if(closebyJetdR->at(i) < 0.8) ++closebyJetsInCone10GeV;
+      if(closebyJetPt->at(i) < 20) continue;
+      if(closebyJetdR->at(i) < 0.8) ++additionalJets;
     }
     ratioDoubleCone = ptDoubleCone/pt;
     setWeight();

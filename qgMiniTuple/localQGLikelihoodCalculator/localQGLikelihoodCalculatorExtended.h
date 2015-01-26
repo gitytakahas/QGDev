@@ -4,7 +4,6 @@
 #include <map>
 #include <TFile.h>
 #include <TH1F.h>
-#include <TMatrixD.h>
 #include <TString.h>
 
 /*
@@ -13,24 +12,22 @@
 
 class QGLikelihoodCalculator{
   public:
-    QGLikelihoodCalculator(const TString& fileName, bool transform = false, bool boostMultiplicity_ = false);
+    QGLikelihoodCalculator(const TString& fileName, bool useWeights = true);
     ~QGLikelihoodCalculator();
-    float computeQGLikelihood(float pt, float eta, float rho, float cbj, std::vector<float> vars_);
-    float computeQGLikelihoodCDF(float pt, float eta, float rho, float cbj, std::vector<float> vars_);
-    bool getBinsFromFile(std::vector<float>& bins, const TString& name );
+    float computeQGLikelihood(float pt, float eta, float rho, float aj, std::vector<float> vars_);
 
   private:
     bool init(const TString& fileName);
+    bool getBinsFromFile(std::vector<float>& bins, const TString& name);
     TH1F* findEntry(TString& binName, int qgIndex, int varIndex);
-    bool isValidRange(float pt, float rho, float eta, float cbj);
+    bool isValidRange(float pt, float rho, float eta, float aj);
     bool getBinNumber(std::vector<float>& bins, float value, int& bin);
-    bool getBinName(TString& binName, float eta, float pt, float rho, float cbj);
-    std::vector<float> transformation(TString& binName, std::vector<float>& varTransform);
+    bool getBinName(TString& binName, float eta, float pt, float rho, float aj);
 
-    std::vector<float> etaBins, ptBins, rhoBins, cbjBins;
+    std::vector<float> etaBins, ptBins, rhoBins, ajBins;
     std::map<TString, TH1F*> pdfs; 
-    std::map<TString, TMatrixD*> varTransforms;
+    std::map<TString, std::vector<float>> weights;
     TFile* f;
-    bool useTransformation, boostMultiplicity;
+    bool useWeights;
 };
 #endif

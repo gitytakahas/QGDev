@@ -24,14 +24,12 @@ TString switchQG(TString inputBin){
 }
 
 int main(int argc, char**argv){
-  TString binning = "v1";
+  TString binning = "v1_PU40bx50";
 
   // Define binning for pdfs (details in binninConfigurations.h)
   binClass bins;
-  if(binning == "defaultBinning") 		bins = getDefaultBinning();
-  if(binning == "8TeVBinning") 			bins = get8TeVBinning();
-  if(binning == "smallEtaBinning") 		bins = getSmallEtaBinning();
-  if(binning == "v1") 				bins = getV1Binning();
+  if(binning.Contains("v1")) 			bins = getV1Binning_();
+  if(binning.Contains("v2")) 			bins = getV2Binning();
 
   // For different jet types (if _antib is added bTag is applied)
   for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){
@@ -41,7 +39,7 @@ int main(int argc, char**argv){
     bins.setReference("pt",  &t.pt);											// Give the binning class a pointer to the variables used to bin in
     bins.setReference("eta", &t.eta);
     bins.setReference("rho", &t.rho);
-
+    bins.setReference("aj",  &t.additionalJets);
 
     // Creation of the pdfs
     std::map<TString, TH1D*> pdfs;

@@ -28,28 +28,23 @@ void setCorrectMinimum(TH2D* h){
 
 
 void makeProfile2D(TString xAndyVar, bool useBins = false, bool extraBinInformation = false){
-  std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
-//std::vector<TString> files	= {"TTJets2"};
-  std::vector<TString> jetTypes = {"AK4","AK4chs"};
+//std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_PU20"};
+  std::vector<TString> files	= {"TTJets"};
+  std::vector<TString> jetTypes = {"AK4chs"};
 
   // Define binning for plots (i.e. separate plots for each bin)
   binClass bins;
-  if(useBins) bins = getV1Binning();
+  if(useBins) bins = getSmallEtaBinning();
 
   // Define x and y-axis variable and bins
   std::vector<float> xAxisBins, yAxisBins; TString xVar, yVar; bool xLog, yLog;
   if(xAndyVar.Contains("eta_")){ 			xAxisBins = bins.getBins(40, 0, 4, false, {4.2,4.4,4.7}); 	xVar = "#eta";					xLog = false;}
   if(xAndyVar.Contains("rho_")){ 			xAxisBins = bins.getBins(8, 0, 40, false, {50});		xVar = "#rho";					xLog = false;}
-  if(xAndyVar.Contains("closebyJetsInCone_")){		xAxisBins = bins.getBins(9, -0.5, 8.5, false, {});		xVar = "N_{jets} within #DeltaR < 0.8";		xLog = false;}
-  if(xAndyVar.Contains("closebyJetsInCone10GeV_")){	xAxisBins = bins.getBins(9, -0.5, 8.5, false, {});		xVar = "N_{jets>10GeV} within #DeltaR < 0.8";	xLog = false;}
-  if(xAndyVar.Contains("deltaRmin_")){			xAxisBins = bins.getBins(6, 0.4, 0.7, false, {0.8, });		xVar = "#DeltaR_{min}";		 		xLog = false;}
-  if(xAndyVar.Contains("ratioDoubleCone_")){		xAxisBins = bins.getBins(17, 0.85, 2.55, false);		xVar = "p_{T}(doubleCone)/p_{T}";	 	xLog = false;}
-  if(xAndyVar.Contains("ptDoubleCone_")){		xAxisBins = bins.getBins(20, 20, 2000, true, {6500});		xVar = "p_{T}(doubleCone)"; 	 		xLog = true;}
+  if(xAndyVar.Contains("additionalJets_")){		xAxisBins = bins.getBins(6, -0.5, 5.5, false, {});		xVar = "N_{jets>20GeV} within #DeltaR < 0.8";	xLog = false;}
   if(xAndyVar.Contains("_eta")){ 			yAxisBins = bins.getBins(40, 0, 4, false, {4.2,4.4,4.7}); 	yVar = "#eta";					yLog = false;}
   if(xAndyVar.Contains("_pt")){				yAxisBins = bins.getBins(20, 20, 2000, true, {6500});		yVar = "p_{T}"; 				yLog = true;}
   if(xAndyVar.Contains("_nPileUp")){			yAxisBins = bins.getBins(10, 10, 70, false);			yVar = "nPileUp"; 				yLog = false;}
   if(xAndyVar.Contains("_nPriVtxs")){			yAxisBins = bins.getBins(10, 5, 55, false);			yVar = "nPriVtxs"; 				yLog = false;}
-  if(xAndyVar.Contains("_ratioDoubleCone")){		yAxisBins = bins.getBins(20, 0.5, 2.5, false);			yVar = "p_{T}/p_{T}(doubleCone)"; 		yLog = false;}
 
   // Needed for 3D plots (which will be needed to get kurtosis and skewness)
   std::vector<float> axis2Bins	= bins.getBins(100, 0, 8, false);
@@ -72,23 +67,17 @@ void makeProfile2D(TString xAndyVar, bool useBins = false, bool extraBinInformat
       bins.setReference("pt",  &t.pt);
       bins.setReference("eta", &t.eta);
       bins.setReference("rho", &t.rho);
+      bins.setReference("aj",  &t.additionalJets);
 
       // Set x and y-axis variables
       float& xAxisVar 	= (xAndyVar.Contains("eta_")?			t.eta :
 			  (xAndyVar.Contains("rho_")?			t.rho :
-			  (xAndyVar.Contains("closebyJetsInCone_")?	t.closebyJetsInCone :
-			  (xAndyVar.Contains("closebyJetsInCone10GeV_")?t.closebyJetsInCone10GeV :
-			  (xAndyVar.Contains("deltaRmin_")?		t.closestJetdR :
-			  (xAndyVar.Contains("ratioDoubleCone_")?	t.ratioDoubleCone : 
-			  (xAndyVar.Contains("ptDoubleCone_")?		t.ptDoubleCone : t.pt)))))));
-      float& yAxisVar 	= (xAndyVar.Contains("_eta")? 			t.eta :
-			  (xAndyVar.Contains("_pt")?			t.pt :
-			  (xAndyVar.Contains("_ratioDoubleCone")?	t.ratioDoubleCone : t.pt)));
+			  (xAndyVar.Contains("additionalJets_")?	t.additionalJets : t.pt)));
+      float& yAxisVar 	= (xAndyVar.Contains("_eta")? 			t.eta : t.pt);
 //    int& yAxisVar 	= (xAndyVar.Contains("_nPileUp"?		t.nPileUp : t.nPriVtxs));
 
       // Init local QGLikelihoodCalculator
-      TString binning = "v1_newTest";
-      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_" + binning + ".root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
 
       // Creation of histos
       std::map<TString, TProfile2D*> plots;

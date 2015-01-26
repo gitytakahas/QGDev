@@ -15,17 +15,17 @@
 #include "binClass.h"
 #include "binningConfigurations.h"
 #include "treeLooper.h"
-#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.h"
-#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculator.cc"
+#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculatorExtended.h"
+#include "../localQGLikelihoodCalculator/localQGLikelihoodCalculatorExtended.cc"
 
 
 int main(int argc, char**argv){
   std::vector<TString> files	= {"QCD_AllPtBins"};
-//std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
+//  std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
   std::vector<TString> jetTypes = {"AK4","AK4chs"};
 
   // Define binning for pdfs
-  binClass bins = getV1Binning();
+  binClass bins = getSmallEtaBinning();
 
   // Loop over different samples and jet types
   for(TString file : files){
@@ -37,9 +37,11 @@ int main(int argc, char**argv){
       bins.setReference("pt",  &t.pt);
       bins.setReference("eta", &t.eta);
       bins.setReference("rho", &t.rho);
+      bins.setReference("aj",  &t.additionalJets);
 
       // Init local QGLikelihoodCalculator
-      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
+      QGLikelihoodCalculator localQG_v1("../data/pdfQG_" + jetType + "_13TeV_v2_PU40bx50.root");
+      QGLikelihoodCalculator localQG_v2("../data/pdfQG_" + jetType + "_13TeV_v1_PU40bx50.root");
 
       // Creation of histos
       std::map<TString, TH1D*> plots;
@@ -51,6 +53,7 @@ int main(int argc, char**argv){
           plots["mult"   + histName]	= new TH1D("mult"   + histName, "mult"      + histName, 140, 2.5, 142.5);
           for(TString var : {"qg","axis2","ptD","mult"}){
             plots[var + "_l" + histName] = new TH1D(var + "_l" + histName, var + "_l" + histName, 100, -0.0001, 1.0001);
+            plots[var + "_l2"+ histName] = new TH1D(var + "_l2"+ histName, var + "_l2"+ histName, 100, -0.0001, 1.0001);
           }
         }
       }
@@ -72,13 +75,17 @@ int main(int argc, char**argv){
         else continue;
 
         TString histName = "_" + type + "_" + binName;
-        plots["axis2"   + histName]->Fill(t.axis2, 										t.weight);
-        plots["ptD"     + histName]->Fill(t.ptD, 										t.weight);
-        plots["mult"    + histName]->Fill(t.mult, 										t.weight);
-        plots["qg_l"    + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
-        plots["axis2_l" + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {-1, -1, t.axis2}), 			t.weight);
-        plots["ptD_l"   + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {-1, t.ptD}), 			t.weight);
-        plots["mult_l"  + histName]->Fill(localQGa.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult}), 			t.weight);
+        plots["axis2"   + histName]->Fill(t.axis2, 													t.weight);
+        plots["ptD"     + histName]->Fill(t.ptD, 													t.weight);
+        plots["mult"    + histName]->Fill(t.mult, 													t.weight);
+        plots["qg_l"    + histName]->Fill(localQG_v1.computeQGLikelihood(t.pt, t.eta, t.rho, t.additionalJets, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
+        plots["axis2_l" + histName]->Fill(localQG_v1.computeQGLikelihood(t.pt, t.eta, t.rho, t.additionalJets, {-1, -1, t.axis2}),	 		t.weight);
+        plots["ptD_l"   + histName]->Fill(localQG_v1.computeQGLikelihood(t.pt, t.eta, t.rho, t.additionalJets, {-1, t.ptD}), 				t.weight);
+        plots["mult_l"  + histName]->Fill(localQG_v1.computeQGLikelihood(t.pt, t.eta, t.rho, t.additionalJets, {(float) t.mult}), 			t.weight);
+        plots["qg_l2"   + histName]->Fill(localQG_v2.computeQGLikelihood(t.pt, t.eta, t.rho, t.additionalJets, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
+        plots["axis2_l2"+ histName]->Fill(localQG_v2.computeQGLikelihood(t.pt, t.eta, t.rho, t.additionalJets, {-1, -1, t.axis2}),	 		t.weight);
+        plots["ptD_l2"  + histName]->Fill(localQG_v2.computeQGLikelihood(t.pt, t.eta, t.rho, t.additionalJets, {-1, t.ptD}), 				t.weight);
+        plots["mult_l2" + histName]->Fill(localQG_v2.computeQGLikelihood(t.pt, t.eta, t.rho, t.additionalJets, {(float) t.mult}), 			t.weight);
       }
       for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX() + 1));
 
@@ -93,13 +100,13 @@ int main(int argc, char**argv){
 
         std::map<TString, TGraph*> roc;
         for(TString var : {"qg","axis2","ptD","mult"}){
-          for(TString type : {"_l",""}){
+          for(TString type : {"_l","_l2",""}){
             if(var.Contains("qg") && type == "") continue;
 
             roc[var+type] = new TGraph(plot.second->GetNbinsX() + 2);
             for(int bin = 0; bin <= plot.second->GetNbinsX() + 1; ++bin){
               TString histName = plot.first;
-              histName.ReplaceAll("qga_l",var+type);
+              histName.ReplaceAll("qg_l",var+type);
               double gluonRej = plots[histName]->Integral(0, bin);
               histName.ReplaceAll("gluon","quark");
               double quarkEff = 1.-plots[histName]->Integral(0, bin);
@@ -109,8 +116,8 @@ int main(int argc, char**argv){
 
             if(var == "axis2")		roc[var+type]->SetLineColor(type == "_l" ? kGreen+4   : kYellow);
             if(var == "ptD")		roc[var+type]->SetLineColor(type == "_l" ? kMagenta+4 : kAzure+10);
-            if(var == "mult")		roc[var+type]->SetLineColor(type == "_l" ? kRed :       kOrange);
-            if(var == "qg")		roc[var+type]->SetLineColor(kBlack);
+            if(var == "mult")		roc[var+type]->SetLineColor(type == "_l" ? kRed       : kOrange);
+            if(var == "qg")		roc[var+type]->SetLineColor(type == "_l" ? kBlack     : kGray);
             roc[var+type]->SetLineWidth(type == "_l" ? 3. : 1.);
             roc[var+type]->SetLineStyle(type == "" ? 3 : 1);
 
@@ -120,6 +127,7 @@ int main(int argc, char**argv){
             if(var == "ptD") 	entryName = "p_{T}D";
             if(var == "mult") 	entryName = "multiplicity";
             if(type == "_l")	entryName += " likelihood";
+            if(type == "_l2")	entryName += " likelihood (additional jet categories)";
             l.AddEntry(roc[var+type], entryName, "l");
 
             if(roc.size() == 1){

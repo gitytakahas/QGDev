@@ -23,11 +23,12 @@ int main(int argc, char**argv){
   bool useDecorrelation		= false;
 
   // Define binning for plots
-  binClass bins = getV1Binning();
+//  binClass bins = getSmallEtaBinning();
+  binClass bins = getNoBinning();
 
   // For different jet types (if _antib is added bTag is applied)
-  for(TString file : {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"}){
-    for(TString jetType : {"AK4","AK4chs"}){
+  for(TString file : {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_PU20"}){
+    for(TString jetType : {"AK4chs"}){
       std::cout << "Making plots for " << jetType << " in file " << file << "..." << std::endl;
       system("rm -rf plots/distributions/" + file + "/" + jetType);
 
@@ -43,13 +44,14 @@ int main(int argc, char**argv){
       std::map<TString, TH1D*> plots;
       std::map<TString, TH2D*> plots2D;
       for(TString binName : bins.getAllBinNames()){
-        for(TString type : {"quark","gluon","bquark","cquark","pu","undefined"}){
+//        for(TString type : {"quark","gluon","bquark","cquark","pu","undefined"}){
+        for(TString type : {"gluon","quark","quarkFromW","quarkFromT","quarkFromH","quarkFromZ","bQuark","bQuarkFromW","bQuarkFromT","bQuarkFromH","bQuarkFromZ"}){
           TString histName = "_" + type + "_" + binName;
           plots["axis2"  + histName] 	= new TH1D("axis2" + histName, "axis2" + histName, 100, 1, 9);
           plots["ptD"    + histName]	= new TH1D("ptD"   + histName, "ptD"   + histName, 100, 0, 1);
           plots["mult"   + histName]	= new TH1D("mult"  + histName, "mult"  + histName, 100, 0.5, 100.5);
           for(TString var : {"qg","axis2","ptD","mult"}){
-            plots[var + "_l" + histName] = new TH1D(var + "_l" + histName, var + "_l" + histName, 100, -0.0001, 1.0001);
+            plots[var + "_l" + histName] = new TH1D(var + "_l" + histName, var + "_l" + histName, 25, -0.0001, 1.0001);
           }
           if(plot2D){
             for(TString var2D : {"qg-axis2","qg-ptD","qg-mult","axis2-ptD","axis2-mult","ptD-mult"}){
@@ -69,6 +71,7 @@ int main(int argc, char**argv){
         if(t.mult < 3) 			continue; 										// Need at least three particles in the jet
 
         TString type;
+/*
         if(t.nGenJetsInCone < 1)		type = "pu";
         else if(!t.matchedJet)			type = "undefined";
         else if(!t.balanced)			type = "undefined";
@@ -80,13 +83,33 @@ int main(int argc, char**argv){
         else if(fabs(t.partonId) == 4) 		type = "cquark";
         else if(fabs(t.partonId) == 5) 		type = "bquark";
         else 					type = "undefined";
+*/
+        if(t.nGenJetsInCone < 1)		continue;
+//        else if(!t.balanced)			continue;
+        else if(t.nGenJetsInCone > 1)		continue;
+        else if(t.nJetsForGenParticle != 1)	continue;
+        else if(t.nGenJetsForGenParticle != 1)	continue;
+        else if(t.partonId == 21) 		type = "gluon";
+        else if(fabs(t.partonId) < 4){
+          if(fabs(t.motherId) == 24) 		type = "quarkFromW";
+          else if(fabs(t.motherId) == 6) 	type = "quarkFromT";
+          else if(fabs(t.motherId) == 25) 	type = "quarkFromH";
+          else if(fabs(t.motherId) == 23) 	type = "quarkFromZ";
+          else 					type = "quark";
+        } else if(fabs(t.partonId) == 5){
+          if(fabs(t.motherId) == 24) 		type = "bQuarkFromW";
+          else if(fabs(t.motherId) == 6) 	type = "bQuarkFromT";
+          else if(fabs(t.motherId) == 25) 	type = "bQuarkFromH";
+          else if(fabs(t.motherId) == 23) 	type = "bQuarkFromZ";
+          else 					type = "bQuark";
+        } else					continue;
 
         float qg_l      = localQG.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2});
         float axis2_l   = localQG.computeQGLikelihood(t.pt, t.eta, t.rho, {-1, -1, t.axis2});
         float ptD_l     = localQG.computeQGLikelihood(t.pt, t.eta, t.rho, {-1, t.ptD});
         float mult_l    = localQG.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult});
 
-        TString histName = "_" + type + "_" + binName; 
+        TString histName = "_" + type + "_" + binName;
         plots["axis2"   + histName]->Fill(t.axis2, 	t.weight);
         plots["ptD"     + histName]->Fill(t.ptD, 	t.weight);
         plots["mult"    + histName]->Fill(t.mult, 	t.weight);
@@ -124,17 +147,42 @@ int main(int argc, char**argv){
 
         THStack stack(plot.first,";"+axisTitle+";"+(norm?"fraction of ":"")+"jets/bin");
         double maximum = 0;
-        for(TString type : {"gluon","quark","bquark","cquark","pu","undefined"}){
+//        for(TString type : {"gluon","quark","bquark","cquark","pu","undefined"}){
+        for(TString type : {"gluon","quark","quarkFromW","quarkFromT","quarkFromH","quarkFromZ","bQuark","bQuarkFromH","bQuarkFromZ","bQuarkFromW","bQuarkFromT"}){
           TString histName = plot.first; histName.ReplaceAll("gluon", type);
           if(plots[histName]->GetEntries() == 0) continue;
-          int color = (type == "gluon"? 46 : (type == "quark"? 38 : (type == "bquark"? 32 : (type == "cquark" ? 42 : (type == "pu" ? 39 : 49)))));
-          if(!overlay || type == "gluon" || type == "quark") plots[histName]->SetFillColor(color);
+//          int color = (type == "gluon"? 46 : (type == "quark"? 38 : (type == "bquark"? 32 : (type == "cquark" ? 42 : (type == "pu" ? 39 : 49)))));
+          int color = (type == "gluon"? 46 :
+                      (type == "quark"? 38 :
+                      (type == "quarkFromW"? 2 :
+                      (type == "quarkFromT" ? 3 :
+                      (type == "quarkFromH" ? 4 :
+                      (type == "quarkFromZ" ? 5 :
+                      (type == "bQuark" ? 42 :
+                      (type == "bQuarkFromH" ? 7 :
+                      (type == "bQuarkFromZ" ? 6 :
+                      (type == "bQuarkFromT" ? 8 :
+                      (type == "bQuarkFromW" ? 28 : 0)))))))))));
+//          if(!overlay || type == "gluon" || type == "quark") plots[histName]->SetFillColor(color);
           plots[histName]->SetLineColor(color);
-          plots[histName]->SetLineWidth(type == "quark" || type == "gluon" ? 3 : 2);
-          if(overlay) plots[histName]->SetFillStyle(type == "quark"? 3004 : 3005);
-          l.AddEntry(plots[histName], (type == "gluon"? "gluon" : (type == "quark"? "uds" : (type == "bquark"? "b" : (type == "cquark"? "c": type)))), "f");
+//          plots[histName]->SetLineWidth(type == "quark" || type == "gluon" ? 3 : 2);
+          plots[histName]->SetLineWidth(3);
+//          if(overlay) plots[histName]->SetFillStyle(type == "quark"? 3004 : 3005);
+//          l.AddEntry(plots[histName], (type == "gluon"? "gluon" : (type == "quark"? "uds" : (type == "bquark"? "b" : (type == "cquark"? "c": type)))), "f");
+          l.AddEntry(plots[histName], (type == "gluon"? "gluon" :
+                                      (type == "quark"? "uds" :
+                                      (type == "bQuark"? "b" :
+                                      (type == "quarkFromW"? "uds (from W)":
+                                      (type == "quarkFromT" ? "uds (from t)" :
+                                      (type == "quarkFromH" ? "uds (from H)" :
+                                      (type == "quarkFromZ" ? "uds (from Z)" :
+                                      (type == "bQuarkFromH"? "b (from H)" :
+                                      (type == "bQuarkFromT"? "b (from T)" :
+                                      (type == "bQuarkFromZ"? "b (from Z)" :
+                                      (type == "bQuarkFromW" ? "b (from W)" : ""))))))))))), "f");
           stack.Add(plots[histName]);
-          if(overlay && (type == "gluon" || type == "quark") && plots[histName]->GetMaximum() > maximum) maximum = plots[histName]->GetMaximum();
+//          if(overlay && (type == "bQuarkFromT" || type == "quarkFromW") && plots[histName]->GetMaximum() > maximum) maximum = plots[histName]->GetMaximum();
+          if(overlay && plots[histName]->GetMaximum() > maximum) maximum = plots[histName]->GetMaximum();
         }
         if(!maximum) continue;
         stack.Draw(overlay ? "nostack" : "");

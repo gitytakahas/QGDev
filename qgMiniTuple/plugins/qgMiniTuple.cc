@@ -201,10 +201,10 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
       nGenJetsForGenParticle 	= countInCone(matchedGenParticle, genJets);
       if(matchedGenParticle->numberOfMothers() == 1){								//Very experimental, but first tests shows it's good at finding W's and t's
         motherId		= matchedGenParticle->mother()->pdgId();					//A bit more difficult for QCD, where it's sometimes a quark, decaying into
-        motherMass	= matchedGenParticle->mother()->mass();						//quark+gluon, and sometimes just a proton with a lot of other QCD mess and 
+        motherMass		= matchedGenParticle->mother()->mass();						//quark+gluon, and sometimes just a proton with a lot of other QCD mess and 
       } else {													//sometimes 2 mothers (mostly two quarks recoiling each other, but sometimes
         motherId		= 0;										//also two quarks going into two gluons etc...)
-        motherMass	= 0;
+        motherMass		= 0;
       }
     } else {
       matchedJet 		= false;

@@ -6,9 +6,10 @@ process = cms.Process("qgMiniTupleProducer")
 # Settings for local tests
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 100
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(1000))
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(10000))
 process.source = cms.Source("PoolSource", 
-    fileNames = cms.untracked.vstring('/store/mc/Phys14DR/QCD_Pt-50to80_Tune4C_13TeV_pythia8/MINIAODSIM/AVE30BX50_tsg_castor_PHYS14_ST_V1-v1/00000/0C31D9A0-548B-E411-ABBB-0025905A60F4.root') # Test file available at T2B
+#    fileNames = cms.untracked.vstring('/store/mc/Phys14DR/QCD_Pt-50to80_Tune4C_13TeV_pythia8/MINIAODSIM/AVE30BX50_tsg_castor_PHYS14_ST_V1-v1/00000/0C31D9A0-548B-E411-ABBB-0025905A60F4.root') # Test file available at T2B
+    fileNames = cms.untracked.vstring('/store/mc/Phys14DR/TTJets_MSDecaysCKM_central_Tune4C_13TeV-madgraph-tauola/MINIAODSIM/PU20bx25_PHYS14_25_V1-v1/00000/00C90EFC-3074-E411-A845-002590DB9262.root') # Test file available at T2B
 )
 
 # Standard configurations
@@ -21,7 +22,7 @@ process.TFileService = cms.Service("TFileService",
 )
 
 
-process.qgMiniTuple = cms.EDAnalyzer("qgMiniTuple",
+process.qgMiniTupleAK4chs = cms.EDAnalyzer("qgMiniTuple",
     rhoInputTag			= cms.InputTag('fixedGridRhoFastjetAll'),
     csvInputTag			= cms.InputTag('combinedInclusiveSecondaryVertexV2BJetTags'),
     vertexInputTag		= cms.InputTag('offlineSlimmedPrimaryVertices'),
@@ -35,4 +36,4 @@ process.qgMiniTuple = cms.EDAnalyzer("qgMiniTuple",
 )
 
 
-process.p = cms.Path(process.qgMiniTuple)
+process.p = cms.Path(process.qgMiniTupleAK4chs)

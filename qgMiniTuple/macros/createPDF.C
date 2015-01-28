@@ -27,18 +27,18 @@ TString switchQG(TString inputBin){
 
 // Main function to create the pdf's
 int main(int argc, char**argv){
-  TString version = "v1_PU40bx50";
+  TString version = "v1";
 
   // Define binning for pdfs (details and more options in binningConfigurations.h)
   binClass bins;
   if(version.Contains("v1")) 	bins = getV1Binning();
-  else return;
+  else return 1;
 
   // For different jet types (if _antib is added bTag is applied)
   for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
-    treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree (third argument is the directory path, if other than default in treeLooper.h)
+    treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_PU20", jetType);						// Init tree (third argument is the directory path, if other than default in treeLooper.h)
     bins.setReference("pt",  &t.pt);											// Give the binning class a pointer to the variables used to bin in
     bins.setReference("eta", &t.eta);
     bins.setReference("rho", &t.rho);

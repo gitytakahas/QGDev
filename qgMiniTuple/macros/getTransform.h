@@ -9,6 +9,10 @@
 #include "binClass.h"
 #include "treeLooper.h"
 
+/*
+ * Old file with some helper functions to work with decorrelation matrices
+ * As the likelihood with weights seemed to be a better solution than a likelihood with decorrelated variables, the code was not used anymore recently
+ */
 
 // Print matrix
 template<typename T> void printMatrix(TString name, std::vector<std::vector<T>> matrix){

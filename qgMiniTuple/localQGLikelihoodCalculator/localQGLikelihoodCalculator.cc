@@ -16,7 +16,7 @@
 
 
 /// Constructor
-QGLikelihoodCalculator::QGLikelihoodCalculator(const TString& filename, bool useWeights) : useWeights(useWeights){
+QGLikelihoodCalculator::QGLikelihoodCalculator(const TString filename, bool useWeights) : useWeights(useWeights){
   if(filename == "" || !init(filename)) throw std::runtime_error(("Initialization failed: " + filename + " not found or corrupt!").Data());
 }
 
@@ -37,18 +37,9 @@ bool QGLikelihoodCalculator::init(const TString& fileName){
   while((keydir = (TKey*) nextdir())){
     if(!keydir->IsFolder()) continue;
     TDirectory *dir = (TDirectory*) keydir->ReadObj();
-    if(TString(dir->GetName()) == "weights"){
-      TIter nextWeights(dir->GetListOfKeys());
-      TKey *keyWeights;
-      while((keyWeights = (TKey*) nextWeights())){
-        weights[keyWeights->GetName()] = std::vector<float>();
-        if(!getBinsFromFile(weights[keyWeights->GetName()], TString(dir->GetName()) + "/" + keyWeights->GetName())) return false;
-      }
-    } else if(TString(dir->GetName()) != "decorrelationMatrices"){
-      TIter nexthist(dir->GetListOfKeys());
-      TKey *keyhist;
-      while((keyhist = (TKey*) nexthist())) pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj();
-    }
+    TIter nexthist(dir->GetListOfKeys());
+    TKey *keyhist;
+    while((keyhist = (TKey*) nexthist())) pdfs[keyhist->GetName()] = (TH1F*) keyhist->ReadObj();
   }
   return true;
 }
@@ -60,7 +51,10 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
 
   TString binName;
   if(!getBinName(binName, eta, pt, rho)) return -1;
+  return computeQGLikelihood(binName, vars);
+}
 
+float QGLikelihoodCalculator::computeQGLikelihood(TString binName, std::vector<float> vars){
   float Q=1., G=1.;
   for(unsigned int varIndex = 0; varIndex < vars.size(); ++varIndex){
     if(vars[varIndex] < -0.5) continue; //use to inspect variables separately (i.e. skip if feeding -1)
@@ -82,13 +76,14 @@ float QGLikelihoodCalculator::computeQGLikelihood(float pt, float eta, float rho
 
 
 
-/// Find matching entry for a given eta, pt, rho, qgIndex and varIndex
+/// Find matching entry for a given binName, qgIndex and varIndex
 TH1F* QGLikelihoodCalculator::findEntry(TString& binName, int qgIndex, int varIndex){
   TString histName = (varIndex == 2 ? "axis2" : (varIndex? "ptD" : "mult")) + TString("_") + (qgIndex ? "gluon":"quark")  + TString("_") +  binName;
   return pdfs[histName];
 }
 
 
+// Construct the binName using eta, pt, rho
 bool QGLikelihoodCalculator::getBinName(TString& binName, float eta, float pt, float rho){
   int etaBin, ptBin, rhoBin;
   if(!getBinNumber(etaBins, fabs(eta), etaBin)) return false;
@@ -97,6 +92,7 @@ bool QGLikelihoodCalculator::getBinName(TString& binName, float eta, float pt, f
   binName = TString::Format("eta%d_pt%d_rho%d", etaBin, ptBin, rhoBin);
   return true;
 }
+
 
 /// Check the valid range of this qg tagger, using the bin vectors
 bool QGLikelihoodCalculator::isValidRange(float pt, float rho, float eta){
@@ -111,7 +107,7 @@ bool QGLikelihoodCalculator::isValidRange(float pt, float rho, float eta){
 
 
 /// Translates the TVector with the bins to std::vector
-bool QGLikelihoodCalculator::getBinsFromFile(std::vector<float>& bins, const TString& name ) {
+bool QGLikelihoodCalculator::getBinsFromFile(std::vector<float>& bins, const TString& name){
   TVectorT<float> *tbins = nullptr;
   f->GetObject(name, tbins);
   if(!tbins) return false;

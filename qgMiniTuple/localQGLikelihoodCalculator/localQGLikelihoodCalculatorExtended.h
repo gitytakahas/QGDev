@@ -7,14 +7,15 @@
 #include <TString.h>
 
 /*
- * A modified version of /RecoJets/JetAlgorithms/interface/QGLikelihoodCalculator.h, working with ROOT files instead of database obect
+ * A modified version of /RecoJets/JetAlgorithms/interface/QGLikelihoodCalculator.h, working with ROOT files instead of database obect [extended for additional jets binning]
  */
 
 class QGLikelihoodCalculator{
   public:
-    QGLikelihoodCalculator(const TString& fileName, bool useWeights = true);
+    QGLikelihoodCalculator(const TString fileName, bool useWeights = true);
     ~QGLikelihoodCalculator();
     float computeQGLikelihood(float pt, float eta, float rho, float aj, std::vector<float> vars_);
+    float computeQGLikelihood(TString binName, std::vector<float> vars_);
 
   private:
     bool init(const TString& fileName);

@@ -12,13 +12,14 @@
 
 class QGLikelihoodCalculator{
   public:
-    QGLikelihoodCalculator(const TString& fileName, bool useWeights = true);
+    QGLikelihoodCalculator(const TString fileName, bool useWeights = true);
     ~QGLikelihoodCalculator();
     float computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars_);
+    float computeQGLikelihood(TString binName, std::vector<float> vars_);
 
   private:
     bool init(const TString& fileName);
-    bool getBinsFromFile(std::vector<float>& bins, const TString& name );
+    bool getBinsFromFile(std::vector<float>& bins, const TString& name);
     TH1F* findEntry(TString& binName, int qgIndex, int varIndex);
     bool isValidRange(float pt, float rho, float eta);
     bool getBinNumber(std::vector<float>& bins, float value, int& bin);

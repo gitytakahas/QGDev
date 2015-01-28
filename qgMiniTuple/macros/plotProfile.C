@@ -47,11 +47,7 @@ int main(int argc, char**argv){
   // Define x and y-axis variable and bins
   std::vector<float> xAxisBins = {0,1}; TString xTitle = ""; bool xLog = false;
   if(xVar == "eta"){ 	      		xAxisBins = bins.getBins(40, 0, 4, false, {4.2,4.4,4.7});		xTitle = "#eta";}
-  if(xVar == "deltaRmin"){ 		xAxisBins = bins.getBins(6, .4, .7, false, {0.8,1});	 		xTitle = "#DeltaR_{min}";}
-//if(xVar == "deltaRmin"){ 		xAxisBins = bins.getBins(16, .4, .8, false, {0.85,0.9,1,1.2}); 		xTitle = "#DeltaR_{min}";}
-  if(xVar == "closebyJetsInCone"){  	xAxisBins = bins.getBins(9, -0.5, 8.5, false, {});		 	xTitle = "N_{jets} within #DeltaR < 0.8";}
-  if(xVar == "closebyJetsInCone10GeV"){	xAxisBins = bins.getBins(9, -0.5, 8.5, false, {});		 	xTitle = "N_{jets} within #DeltaR < 0.8";}
-  if(xVar == "ratioDoubleCone"){  	xAxisBins = bins.getBins(8, 1, 2, false, {});		 		xTitle = "p_{T}/p_{T}(doubleCone)";}
+  if(xVar == "additionalJets"){		xAxisBins = bins.getBins(6, -0.5, 5.5, false, {});		 	xTitle = "N_{jets>20GeV} within #DeltaR < 0.8";}
   if(xVar == "rho"){  			xAxisBins = bins.getBins(9, 5, 50, false, {});		 		xTitle = "#rho";}
   if(xVar == "nPileUp"){  		xAxisBins = bins.getBins(12, 9.5, 69.5, false, {});		 	xTitle = "nPileUp";}
   if(xVar == "nPriVtxs"){  		xAxisBins = bins.getBins(9, 9.5, 54.5, false, {});		 	xTitle = "nPriVtxs";}
@@ -70,16 +66,12 @@ int main(int argc, char**argv){
       bins.setReference("rho", &t.rho);
 
       // Set x-axis variable
-      float& xAxisVar = (xVar == "deltaRmin" ? 			t.closestJetdR : 
-                        (xVar == "closebyJetsInCone" ? 		t.closebyJetsInCone : 
-                        (xVar == "closebyJetsInCone10GeV" ? 	t.closebyJetsInCone10GeV : 
-                        (xVar == "ratioDoubleCone" ? 		t.ratioDoubleCone : 
-                        (xVar == "rho" ? 			t.rho : 
-			t.eta)))));
+      float& xAxisVar = (xVar == "additionalJets" ? 		t.additionalJets : 
+                        (xVar == "rho" ? 			t.rho : t.eta));
 //    int& xAxisVar =   (xVar == "nPileUp" ? 			t.nPileUp : t.nPriVtxs);
 
       // Init local QGLikelihoodCalculator
-      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1_newTest.root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
 
       // Creation of histos
       std::map<TString, TProfile*> plots;

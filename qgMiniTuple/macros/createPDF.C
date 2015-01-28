@@ -11,25 +11,28 @@
 #include "binningConfigurations.h"
 #include "treeLooper.h"
 
+// Function to rebin a histogram, and print information
 void rebin(TH1* hist, int rebinFactor){
   hist->Rebin(rebinFactor);
   std::cout << std::left << std::setw(20) << TString::Format("Rebinned (%d):", rebinFactor);
   std::cout << std::left << std::setw(40) << hist->GetTitle() << "(entries: " << hist->GetEntries() << ")" << std::endl;
 }
 
+// Function to switch between identification string of quark and gluon pdf
 TString switchQG(TString inputBin){
   if(inputBin.Contains("gluon")) inputBin.ReplaceAll("gluon","quark");
   else                           inputBin.ReplaceAll("quark","gluon");
   return inputBin;
 }
 
+// Main function to create the pdf's
 int main(int argc, char**argv){
-  TString binning = "v1_PU40bx50";
+  TString version = "v1_PU40bx50";
 
-  // Define binning for pdfs (details in binninConfigurations.h)
+  // Define binning for pdfs (details and more options in binningConfigurations.h)
   binClass bins;
-  if(binning.Contains("v1")) 			bins = getV1Binning_();
-  if(binning.Contains("v2")) 			bins = getV2Binning();
+  if(version.Contains("v1")) 	bins = getV1Binning();
+  else return;
 
   // For different jet types (if _antib is added bTag is applied)
   for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){
@@ -39,7 +42,6 @@ int main(int argc, char**argv){
     bins.setReference("pt",  &t.pt);											// Give the binning class a pointer to the variables used to bin in
     bins.setReference("eta", &t.eta);
     bins.setReference("rho", &t.rho);
-    bins.setReference("aj",  &t.additionalJets);
 
     // Creation of the pdfs
     std::map<TString, TH1D*> pdfs;
@@ -63,7 +65,6 @@ int main(int argc, char**argv){
       if((fabs(t.partonId) > 3 && t.partonId != 21)) 						continue; 		// Keep only udsg
       if(t.bTag) 										continue;		// Anti-b tagging (always false if jetType does not contain "antib")
       if(!t.balanced) 										continue;		// Take only two leading jets with pt3 < 0.15*(pt1+pt2)  (surpresses small radiated jets with pt <<< pthat)
-      if(binning == "8TeVBinning" && fabs(t.eta) > 2 && fabs(t.eta) < 3) 			continue;		// 8 TeV binning didn't use the intermediate
       if(t.mult < 3)										continue;		// Avoid jets with less than 3 particles (otherwise axis2=0)
       TString type = (t.partonId == 21? "gluon" : "quark");								// Define q/g
       TString histName = "_" + type + "_" + binName;
@@ -78,7 +79,7 @@ int main(int argc, char**argv){
     std::map<TString, float> mean;
     std::map<TString, float> rms;
     for(auto& pdf : pdfs){
-      if(pdf.second->GetEntries() == 0){ std::cout << "Error: no entries in " << pdf.first << std::endl; exit(1);}	// Force to exit when no entries in pdfs: some pt/eta/rho bins have to be merged first
+      if(pdf.second->GetEntries() == 0){ std::cout << "Error: no entries in " << pdf.first << std::endl; exit(1);}	// Force to exit when no entries in pdfs: the binning configuration should be altered to avoid this
       mean[pdf.first] = pdf.second->GetMean();
       rms[pdf.first]  = pdf.second->GetRMS();
     }
@@ -131,10 +132,12 @@ int main(int argc, char**argv){
         float content = temp->GetBinContent(i);
         float width   = temp->GetBinWidth(i);
         int j = 1;
-        while(content <= 0 && i-j > 0 && i+j <= pdf.second->GetNbinsX()){
-          content += temp->GetBinContent(i-j) + temp->GetBinContent(i+j);
-          width   += temp->GetBinWidth(i-j)   + temp->GetBinWidth(i+j);
-          ++j;
+        if(temp->Integral(0, i) > 0 && temp->Integral(i, temp->GetNbinsX()+1) > 0){					// Don't average on the edges of the pdf
+          while(content <= 0 && i-j > 0 && i+j <= pdf.second->GetNbinsX()){
+            content += temp->GetBinContent(i-j) + temp->GetBinContent(i+j);
+            width   += temp->GetBinWidth(i-j)   + temp->GetBinWidth(i+j);
+            ++j;
+          }
         }
         pdf.second->SetBinContent(i, content/width);
       }
@@ -148,7 +151,7 @@ int main(int argc, char**argv){
     for(auto& pdf : pdfs){
       for(int i = 0; i <= pdf.second->GetNbinsX() + 1; ++i){
         if(pdf.second->GetBinContent(i) <= 0 && pdfs[switchQG(pdf.first)]->GetBinContent(i) <= 0){
-          bool isBelow    = (mean[pdf.first] < mean[switchQG(pdf.first)]);
+          bool isBelow = (mean[pdf.first] < mean[switchQG(pdf.first)]);
           if(isBelow) pdf.second->SetBinContent(i, 0.000001);
           else        pdf.second->SetBinContent(i, 0.000999);
         }
@@ -167,7 +170,7 @@ int main(int argc, char**argv){
 
 
     // Make file and write binnings
-    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + "_13TeV_" + binning + ".root","RECREATE");
+    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + "_13TeV_" + version + ".root","RECREATE");
     pdfFile->cd();
     bins.writeBinsToFile();
 

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <algorithm>
 #include "TFile.h"
 #include "TH1D.h"
 #include "TCanvas.h"
@@ -27,18 +28,19 @@ TString switchQG(TString inputBin){
 
 // Main function to create the pdf's
 int main(int argc, char**argv){
-  TString version = "v1";
+  TString version = "v2_PU40bx50";
 
   // Define binning for pdfs (details and more options in binningConfigurations.h)
   binClass bins;
   if(version.Contains("v1")) 	bins = getV1Binning();
+  if(version.Contains("v2")) 	bins = getV2Binning(version.Contains("PU40bx50"));
   else return 1;
 
   // For different jet types (if _antib is added bTag is applied)
-  for(TString jetType : {"AK4","AK4_antib","AK4chs","AK4chs_antib"}){
+  for(TString jetType : {"AK4chs","AK4chs_antib","AK4","AK4_antib"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
-    treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_PU20", jetType);						// Init tree (third argument is the directory path, if other than default in treeLooper.h)
+    treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree (third argument is the directory path, if other than default in treeLooper.h)
     bins.setReference("pt",  &t.pt);											// Give the binning class a pointer to the variables used to bin in
     bins.setReference("eta", &t.eta);
     bins.setReference("rho", &t.rho);
@@ -48,9 +50,9 @@ int main(int argc, char**argv){
     for(TString binName : bins.getAllBinNames()){
       for(TString type : {"quark","gluon"}){
         TString histName = "_" + type + "_" + binName;
-        pdfs["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, 200, 0, 8);
+        pdfs["axis2" + histName] = new TH1D("axis2" + histName, "axis2" + histName, 100, 0, 8);				// Has been 200 bins before, but seemed to have a bit too much fluctuations still
         pdfs["mult"  + histName] = new TH1D("mult"  + histName, "mult"  + histName, 140, 2.5, 142.5);
-        pdfs["ptD"   + histName] = new TH1D("ptD"   + histName, "ptD"   + histName, 200, 0, 1);
+        pdfs["ptD"   + histName] = new TH1D("ptD"   + histName, "ptD"   + histName, 100, 0, 1);				// Also 200 before
       }
     }
 
@@ -74,6 +76,19 @@ int main(int argc, char**argv){
       pdfs["ptD"   + histName]->Fill(t.ptD);
     }
 
+    // Try to add statistics from neighbours (first make copy, so you don't get an iterative effect)
+    std::map<TString, TH1D*> pdfsCopy;
+    for(auto& pdf : pdfs) pdfsCopy[pdf.first] = (TH1D*) pdf.second->Clone(pdf.first + "clone");
+    for(TString binName : bins.getAllBinNames()){
+      for(TString var : {"axis2","mult","ptD"}){
+        for(TString neighbour : bins.getNeighbourBins(binName, var)){							// If neighbours are defined: add their statistics
+          for(TString type : {"quark","gluon"}){
+            pdfs[var + "_" + type + "_" + binName]->Add(pdfsCopy[var + "_" + type + "_" + neighbour]);
+          }
+        }
+      }
+    }
+    for(auto& copy : pdfsCopy) delete copy.second;
 
     // Store the mean and RMS of the original histogram (because they could be changed by rebinning operations)
     std::map<TString, float> mean;
@@ -85,7 +100,8 @@ int main(int argc, char**argv){
     }
 
 
-    // Check "smoothness" of the pdf, and rebin if needed
+    // Check "smoothness" of the pdf: if fluctuations seem really big, we do a rebinning
+    std::map<TString, int> rebinFactor;
     for(auto& pdf : pdfs){
       bool isBelow      = (mean[pdf.first] < mean[switchQG(pdf.first)]);						// Define region between low(meanQ, meanG) - RMS <--> high(meanQ, meanG) + RMS
       TString low	= isBelow? pdf.first : switchQG(pdf.first);							// Most events will be within those borders, so we should not allow empty bins here
@@ -93,8 +109,8 @@ int main(int argc, char**argv){
       int leftBin	= pdf.second->FindBin(mean[low] - rms[low]) - 1;
       int rightBin	= pdf.second->FindBin(mean[high] + rms[high]) + 1;
      
-      int leftBin2      = 0;												// Define region of the peak: moste extreme bins which exceed 80% of the maximum
-      int rightBin2     = 0;												// We will check for bins within this region which go below 60%
+      int leftBin2      = 0;												// Define region of the peak: most extreme bins which exceed 80% of the maximum
+      int rightBin2     = 0;												// We will check for bins within this region which go below 70%
       for(int bin = 1; bin < pdf.second->GetNbinsX(); ++bin){								// In such cases the fluctuations are really high and a larger bin width is preferred
         if(pdf.second->GetBinContent(bin) > pdf.second->GetMaximum()*0.8){						// (Maybe the thresholds could still be optimized a bit more though)
           if(!leftBin2) leftBin2  = bin;
@@ -106,54 +122,89 @@ int main(int argc, char**argv){
       int maxEmptyBins  = 0;
       for(int bin = 1; bin < pdf.second->GetNbinsX(); ++bin){
         if(     bin >= leftBin  && bin <= rightBin  && pdf.second->GetBinContent(bin) <= 0)                            ++emptyBins;
-        else if(bin >= leftBin2 && bin <= rightBin2 && pdf.second->GetBinContent(bin) <= pdf.second->GetMaximum()*0.6) ++emptyBins;
+        else if(bin >= leftBin2 && bin <= rightBin2 && pdf.second->GetBinContent(bin) <= pdf.second->GetMaximum()*0.7) ++emptyBins;
         else {
           if(emptyBins > maxEmptyBins) maxEmptyBins = emptyBins;
           emptyBins = 0;
         }
       }
-      if(emptyBins > maxEmptyBins) maxEmptyBins = emptyBins;
+      rebinFactor[pdf.first] = std::max(maxEmptyBins, emptyBins);
+    }
 
-      if(maxEmptyBins > 19)     std::cout << "This pdf has a lot of emtpy bins and fluctuations:" << std::endl;
-      if(maxEmptyBins > 9)      rebin(pdf.second, 20);
-      else if(maxEmptyBins > 4) rebin(pdf.second, 10);
-      else if(maxEmptyBins > 3) rebin(pdf.second, 5);
-      else if(maxEmptyBins > 1) rebin(pdf.second, 4);
-      else if(maxEmptyBins > 0) rebin(pdf.second, 2);
+    for(auto& pdf : pdfs) rebinFactor[pdf.first] = std::max(rebinFactor[pdf.first], rebinFactor[switchQG(pdf.first)]);	// Use same rebin factor in quark and gluon pdf (otherwise bias if second derivate of pdf is non-zero)
+    
+    for(auto& pdf : pdfs){
+      if(rebinFactor[pdf.first] > 19)     std::cout << "This pdf has a lot of emtpy bins and fluctuations:" << std::endl;
+      if(rebinFactor[pdf.first] > 9)      rebin(pdf.second, 20);
+      else if(rebinFactor[pdf.first] > 4) rebin(pdf.second, 10);
+      else if(rebinFactor[pdf.first] > 3) rebin(pdf.second, 5);
+      else if(rebinFactor[pdf.first] > 1) rebin(pdf.second, 4);
+      else if(rebinFactor[pdf.first] > 0) rebin(pdf.second, 2);
     }
 
 
-    // Use right normalization, and try to average out leftover empty bins (originally applied in QGLikelihoodCalculator.cc but more efficient to them already here):
-    for(auto& pdf : pdfs){
-      pdf.second->Scale(1./pdf.second->Integral(0, pdf.second->GetNbinsX() + 1));					// Scale to integral=1 (also include underflow/overflow)
+    // Normalization of the pdf's
+    for(auto& pdf : pdfs) pdf.second->Scale(1./pdf.second->Integral(0, pdf.second->GetNbinsX() + 1));			// Scale to integral=1 (also include underflow/overflow)
 
-      TH1* temp = (TH1*) pdf.second->Clone();
+
+    // Try to average out leftover fluctuations and empty bins
+    for(auto& pdf : pdfs){
+      if(pdf.first.Contains("gluon")) continue;
+
+      TH1* tempQ = (TH1*) pdf.second->Clone();
+      TH1* tempG = (TH1*) pdfs[switchQG(pdf.first)]->Clone();
       for(int i = 1; i < pdf.second->GetNbinsX() + 1; ++i){								// Do not consider underflow/overflow
-        float content = temp->GetBinContent(i);
-        float width   = temp->GetBinWidth(i);
-        int j = 1;
-        if(temp->Integral(0, i) > 0 && temp->Integral(i, temp->GetNbinsX()+1) > 0){					// Don't average on the edges of the pdf
-          while(content <= 0 && i-j > 0 && i+j <= pdf.second->GetNbinsX()){
-            content += temp->GetBinContent(i-j) + temp->GetBinContent(i+j);
-            width   += temp->GetBinWidth(i-j)   + temp->GetBinWidth(i+j);
-            ++j;
+        float contentQ = tempQ->GetBinContent(i);
+        float contentG = tempG->GetBinContent(i);
+        float width    = tempQ->GetBinWidth(i);
+
+        if((2*contentQ < tempQ->GetBinContent(i-1) && 2*contentQ < tempQ->GetBinContent(i+1)) ||			// Try to average out some extreme fluctuations
+           (2*contentG < tempG->GetBinContent(i-1) && 2*contentG < tempG->GetBinContent(i+1)) ||
+           (contentQ > 2*tempQ->GetBinContent(i-1) && contentQ < 2*tempQ->GetBinContent(i+1)) ||
+           (contentG > 2*tempG->GetBinContent(i-1) && contentG < 2*tempG->GetBinContent(i+1))){
+          if(i-1 > 0 && i+1 < pdf.second->GetNbinsX() + 1){
+            contentQ += tempQ->GetBinContent(i-1) + tempQ->GetBinContent(i+1);
+            contentG += tempG->GetBinContent(i-1) + tempG->GetBinContent(i+1);
+            width    += tempQ->GetBinWidth(i-1)   + tempQ->GetBinWidth(i+1);
           }
         }
-        pdf.second->SetBinContent(i, content/width);
+
+        int j = 1;
+        while(contentQ <= 0 || contentG <= 0){										// Average empty bins
+          if(tempQ->Integral(0, i-j) <= 0) break;									// but not when surpassing the extreme edges of the pdf (see next part)
+          if(tempG->Integral(0, i-j) <= 0) break;
+          if(tempQ->Integral(i+j, tempQ->GetNbinsX()+1) <= 0) break;
+          if(tempG->Integral(i+j, tempG->GetNbinsX()+1) <= 0) break;
+          if(i-j == 0) break;
+          if(i+j == pdf.second->GetNbinsX()) break;
+          contentQ += tempQ->GetBinContent(i-j) + tempQ->GetBinContent(i+j);
+          contentG += tempG->GetBinContent(i-j) + tempG->GetBinContent(i+j);
+          width    += tempQ->GetBinWidth(i-j)   + tempQ->GetBinWidth(i+j);
+          ++j;
+        }
+
+        pdf.second->SetBinContent(i, contentQ/width);
+        pdfs[switchQG(pdf.first)]->SetBinContent(i, contentG/width);
       }
-      delete temp;
+      delete tempQ;
+      delete tempG;
     }
 
 
-    // Even after rebinning and averaging the empty bins out, we still could have some empty bins at the extreme edges
-    // If both quark and gluon pdf have an empty bin, we assign extreme values
+    // Now there are still empty bins left on the edges of the pdf, for which we assign extreme values to avoid a 0
     // (relative though, so it does not dominate the pdf's when we want to inspect them in the ROOT file; 0.000001/0.000999 has the same effect as 0.001/0.999)
     for(auto& pdf : pdfs){
+      if(pdf.first.Contains("gluon")) continue;
       for(int i = 0; i <= pdf.second->GetNbinsX() + 1; ++i){
-        if(pdf.second->GetBinContent(i) <= 0 && pdfs[switchQG(pdf.first)]->GetBinContent(i) <= 0){
+        if(pdf.second->GetBinContent(i) <= 0 || pdfs[switchQG(pdf.first)]->GetBinContent(i) <= 0){
           bool isBelow = (mean[pdf.first] < mean[switchQG(pdf.first)]);
-          if(isBelow) pdf.second->SetBinContent(i, 0.000001);
-          else        pdf.second->SetBinContent(i, 0.000999);
+          if(isBelow == pdf.second->GetBinCenter(i) < mean[pdf.first]){
+            pdf.second->SetBinContent(i, 0.000999);
+            pdfs[switchQG(pdf.first)]->SetBinContent(i, 0.000001);
+          } else {
+            pdf.second->SetBinContent(i, 0.000001);
+            pdfs[switchQG(pdf.first)]->SetBinContent(i, 0.000999);
+          }
         }
       }
     }

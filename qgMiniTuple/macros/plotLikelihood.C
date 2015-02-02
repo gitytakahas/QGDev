@@ -11,10 +11,10 @@
  * (useful to inspect if pdf's are smooth enough, even though fluctuations on the edges or low statistic bins are unavoidable)
  */
 int main(int argc, char**argv){
-  system("rmr ./plots/likelihoodValues");
+  system("rm -r ./plots/likelihoodValues/");
 
-  QGLikelihoodCalculator localQG("../data/pdfQG_AK4chs_13TeV_v1.root");					// Init localQGLikelihoodCalculator
-  binClass bins = getV1Binning();									// Define binning for the plots (i.e. the same as used to create the pdf's)
+  QGLikelihoodCalculator localQG("../data/pdfQG_AK4chs_13TeV_v2_PU40bx50.root");			// Init localQGLikelihoodCalculator
+  binClass bins = getV2Binning(true);									// Define binning for the plots (i.e. the same as used to create the pdf's)
 
   std::map<TString, TH1D*> plots;
   for(TString binName : bins.getAllBinNames()){
@@ -27,12 +27,12 @@ int main(int argc, char**argv){
       float var_l   		= localQG.computeQGLikelihood(binName, {var, -1, -1});
       plots["mult"]->SetBinContent(bin, var_l);
     }
-    for(int bin = 0; bin < plots["ptD"]->GetNbinsX(); ++bin){
+    for(int bin = 0; bin < plots["ptD"]->GetNbinsX() + 1; ++bin){
       float var     		= plots["ptD"]->GetBinCenter(bin);
       float var_l   		= localQG.computeQGLikelihood(binName, {-1, var, -1});
       plots["ptD"]->SetBinContent(bin, var_l);
     }
-    for(int bin = 0; bin < plots["axis2"]->GetNbinsX(); ++bin){
+    for(int bin = 0; bin < plots["axis2"]->GetNbinsX() + 1; ++bin){
       float var     		= plots["axis2"]->GetBinCenter(bin);
       float var_l   		= localQG.computeQGLikelihood(binName, {-1, -1, var});
       plots["axis2"]->SetBinContent(bin, var_l);

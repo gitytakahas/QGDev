@@ -32,6 +32,8 @@ class binClass{
     std::map<TString, std::vector<float>> 	binRanges;
     std::map<TString, std::vector<TString>> 	linkedBins;
     std::map<TString, TString> 			masterBins;
+    std::map<TString, std::vector<TString>> 	neighbourBins;
+    std::map<TString, std::vector<TString>> 	neighbourBinsVarString;
     std::map<TString, std::vector<float>> 	varWeights;
     
   public:
@@ -42,14 +44,16 @@ class binClass{
     std::vector<float> 		getBins(int, float, float, bool, std::vector<float>);
     void 			setBinRange(TString, TString, std::vector<float>);
     void 			setLink(TString, TString);
+    void 			setNeighbour(TString, TString, TString varString = "mult_axis2_ptD");
     void 			setReference(TString name, float* pointer){ 		 varPointers[name] = pointer;}
     void 			setWeights(TString binName, std::vector<float> weights){ varWeights[binName] = weights;}
     float 			getWeight(TString binName, int varIndex){ 		 return varWeights.count(binName)? varWeights[binName][varIndex] : 1.;};
 
     // Functions to retrieve all bin names, and the links between them 
     std::vector<TString> 	getAllBinNames(bool);
-    std::vector<TString> 	getLinkedBins(TString bin){ return (linkedBins.count(bin) ? linkedBins[bin] : std::vector<TString>());}
-    TString 			masterOfBin(TString bin){   return (masterBins.count(bin) ? masterBins[bin] : "");}
+    std::vector<TString>	getLinkedBins(TString bin){    return (linkedBins.count(bin) ? linkedBins[bin] : std::vector<TString>());}
+    TString 			masterOfBin(TString bin){      return (masterBins.count(bin) ? masterBins[bin] : "");}
+    std::vector<TString> 	getNeighbourBins(TString bin, TString selectVar = "mult_axis2_ptD");
 
     // Functions to retrieve bin name, bin numbers,...
     bool 			getBinName(TString&);
@@ -152,7 +156,7 @@ void binClass::setBinRange(TString varName, TString displayName, std::vector<flo
 // Redirects one bin to another, taking into account already existing links
 void binClass::setLink(TString master, TString toBeLinked){
   auto allBinNames = getAllBinNames(true);
-  if(!contains(allBinNames, master)){     std::cout << master     << " does not exist!" << std::endl; exit(1);}		// Check if master and toBeLinked exist and are not the sane
+  if(!contains(allBinNames, master)){     std::cout << master     << " does not exist!" << std::endl; exit(1);}		// Check if master and toBeLinked exist and are not the same
   if(!contains(allBinNames, toBeLinked)){ std::cout << toBeLinked << " does not exist!" << std::endl; return;}
   if(master == toBeLinked) return;
 
@@ -172,6 +176,35 @@ void binClass::setLink(TString master, TString toBeLinked){
   }
 }
 
+
+// Set neighbour (events from a neighbour bin are also used to build the pdf), this allows to go for overlapping bins, resulting in a finer binning while keeping the same statistics
+void binClass::setNeighbour(TString thisBin, TString neighbour, TString varString){
+  auto allBinNames = getAllBinNames(true);
+  if(!contains(allBinNames, thisBin)){   std::cout << thisBin   << " does not exist!" << std::endl; exit(1);}		// Check if thisBin and neighbour exist and are not the same
+  if(!contains(allBinNames, neighbour)){ std::cout << neighbour << " does not exist!" << std::endl; return;}
+  if(masterOfBin(thisBin) != "")   thisBin   = masterOfBin(thisBin);
+  if(masterOfBin(neighbour) != "") neighbour = masterOfBin(neighbour);
+  if(thisBin == neighbour)         return;
+
+  if(neighbourBins.find(thisBin) == neighbourBins.end()) neighbourBins[thisBin] = std::vector<TString>();
+  if(!contains(neighbourBins[thisBin], neighbour)){
+    std::cout << "Adding " << neighbour << " as neighbour to " << thisBin << " (" << varString << ")" << std::endl;
+    neighbourBins[thisBin].push_back(neighbour);
+    neighbourBinsVarString[thisBin].push_back(varString);
+  }
+}
+
+
+// Get vector of neighbour bins for specific bin and selected variables
+std::vector<TString> binClass::getNeighbourBins(TString bin, TString selectVar){
+  std::vector<TString> neighbours;
+  if(neighbourBins.count(bin)){
+    for(int i=0; i < neighbourBins[bin].size(); ++i){
+      if(neighbourBinsVarString[bin].at(i).Contains(selectVar)) neighbours.push_back(neighbourBins[bin].at(i));
+    }
+  }
+  return neighbours;
+}
 
 /*
  * Find the bin based on the variable pointers and bins, returns true if found

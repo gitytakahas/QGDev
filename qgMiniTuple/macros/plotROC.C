@@ -57,10 +57,16 @@ int main(int argc, char**argv){
       localQG["2"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_v2_PU40bx50.root");
 
       // Creation of histos
-      std::vector<TString> rocTypes = {""};
+      std::vector<TString> rocTypes; for(auto& l : localQG) rocTypes.push_back("_" + l.first); rocTypes.push_back("");
       std::map<TString, TH1D*> plots;
       for(TString binName : bins.getAllBinNames()){
         for(TString pdfBin : pdfBins.getAllBinNames()){
+          bool createHist = true;
+          for(TString binVar : {"pt","eta","rho","aj"}){
+            if(pdfBins.getLowerEdge(pdfBin, binVar) >= bins.getUpperEdge(binName, binVar)) createHist = false;		// Try to minimize memory consumption: create only histograms if two bins are overlapping with each other (could get really heavy otherwise)
+            if(pdfBins.getUpperEdge(pdfBin, binVar) <= bins.getLowerEdge(binName, binVar)) createHist = false;
+          }
+          if(!createHist) continue;
           for(TString type : {"quark","gluon"}){
             TString histName = "_" + type + "_" + binName + pdfBin;
             plots["axis2"  + histName] 	= new TH1D("axis2"  + histName, "axis2"     + histName, 200, 0, 8);
@@ -70,7 +76,6 @@ int main(int argc, char**argv){
               for(auto& l : localQG){
                 TString id = var + "_" + l.first + histName;
                 plots[id] = new TH1D(id, id, 100, -0.0001, 1.0001);
-                rocTypes.push_back("_" + l.first);
               }
             }
           }
@@ -116,9 +121,10 @@ int main(int argc, char**argv){
               if(var + rocType == "qg") continue;
               for(TString pdfBin : pdfBins.getAllBinNames()){
                 TString histName = var + rocType + "_" + type + "_" + binName;
+                if(!plots[histName + pdfBin]) continue;
                 if(!plots[histName + pdfBin]->GetEntries()) continue;
                 if(!normalizedPlots[histName]) normalizedPlots[histName] = (TH1D*) plots[histName + pdfBin]->Clone();
-                else                           normalizedPlots[histName]->Add((TH1D*) plots[histName + pdfBin]->Clone());
+                else                           normalizedPlots[histName]->Add(plots[histName + pdfBin]->Clone());
               }
             }
           }
@@ -155,8 +161,8 @@ int main(int argc, char**argv){
             if(var == "ptD")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kMagenta+4 : kAzure+10);
             if(var == "mult")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kRed :       kOrange);
             if(var == "qg")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kGray :      kBlack);
-            roc[var+type]->SetLineWidth(type == rocTypes[2] ? 3. : 1.);
-            roc[var+type]->SetLineStyle(type == "" ? 3 : 1);
+            roc[var+type]->SetLineWidth(type == rocTypes[0] ? 3. : 1.);
+            roc[var+type]->SetLineStyle(type == rocTypes[3] ? 3 : 1);
 
 
             TString entryName = "quark-gluon";

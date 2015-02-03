@@ -16,7 +16,7 @@
 
 
 /// Constructor
-QGLikelihoodCalculator::QGLikelihoodCalculator(const TString filename, bool useWeights) : useWeights(useWeights){
+QGLikelihoodCalculator::QGLikelihoodCalculator(const TString filename){
   if(filename == "" || !init(filename)) throw std::runtime_error(("Initialization failed: " + filename + " not found or corrupt!").Data());
 }
 

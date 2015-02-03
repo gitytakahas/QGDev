@@ -12,7 +12,7 @@
 
 class QGLikelihoodCalculator{
   public:
-    QGLikelihoodCalculator(const TString fileName, bool useWeights = true);
+    QGLikelihoodCalculator(const TString fileName);
     ~QGLikelihoodCalculator();
     float computeQGLikelihood(float pt, float eta, float rho, std::vector<float> vars_);
     float computeQGLikelihood(TString binName, std::vector<float> vars_);
@@ -29,6 +29,5 @@ class QGLikelihoodCalculator{
     std::map<TString, TH1F*> pdfs; 
     std::map<TString, std::vector<float>> weights;
     TFile* f;
-    bool useWeights;
 };
 #endif

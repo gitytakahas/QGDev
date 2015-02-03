@@ -124,7 +124,7 @@ int main(int argc, char**argv){
                 if(!plots[histName + pdfBin]) continue;
                 if(!plots[histName + pdfBin]->GetEntries()) continue;
                 if(!normalizedPlots[histName]) normalizedPlots[histName] = (TH1D*) plots[histName + pdfBin]->Clone();
-                else                           normalizedPlots[histName]->Add(plots[histName + pdfBin]->Clone());
+                else                           normalizedPlots[histName]->Add(plots[histName + pdfBin]);
               }
             }
           }

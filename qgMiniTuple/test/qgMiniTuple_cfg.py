@@ -14,8 +14,8 @@ process.source = cms.Source("PoolSource",
 process.load('Configuration.StandardSequences.Services_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 process.load("Configuration.StandardSequences.MagneticField_cff")
-process.load('Configuration.StandardSequences.GeometryExtended_cff')
-process.load("Configuration.Geometry.GeometryIdeal_cff")
+#process.load("Geometry.TrackerGeometryBuilder.trackerGeometryDB_cfi") 
+process.load("Configuration.Geometry.GeometryRecoDB_cff") 
 process.GlobalTag.globaltag = 'MCRUN2_74_V9A::All'
 
 # Use TFileService to put trees from different analyzers in one file
@@ -36,7 +36,8 @@ process.myRecoPFJets = cms.Sequence(process.fixedGridRhoFastjetAll + process.pfN
 
 # Jet energy corrections and b-tagging
 process.load('JetMETCorrections.Configuration.DefaultJEC_cff')
-process.load('RecoBTag.Configuration.RecoBTag_cff')
+process.load('QGDev.qgMiniTuple.RecoBTagAK4_cff')
+process.load('QGDev.qgMiniTuple.RecoBTagAK4CHS_cff')
 
 # Use clones of the QGTagger process for the different jet collections available [CMSSW_7_4_X and higher]
 # process.load('RecoJets.JetProducers.QGTagger_cfi')
@@ -52,12 +53,15 @@ process.qgMiniTupleAK4 = cms.EDAnalyzer("qgMiniTuple",
     genJetsInputTag		= cms.InputTag('ak4GenJets'),
     jec				= cms.string('ak4PFL1FastL2L3'),
     genParticlesInputTag	= cms.InputTag('genParticles'),
-    csvInputTag			= cms.InputTag(''),				# No recipe for b-tagging of non-CHS jets (i.e. we do not provide trainings for non-CHS anti-b)
+    csvInputTag			= cms.InputTag('ak4CombinedInclusiveSecondaryVertexV2BJetTags'),
 #   qgVariablesInputTag		= cms.InputTag('QGTaggerAK4'),
     minJetPt			= cms.untracked.double(20.),
     deltaRcut			= cms.untracked.double(0.3),
 )
-process.qgMiniTupleAK4chs 	= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak4PFJetsCHS', jec = 'ak4PFCHSL1FastL2L3') #, csvInputTag = 'combinedInclusiveSecondaryVertexV2BJetTags')#, qgVariablesInputTag = 'QGTaggerAK4chs')
+process.qgMiniTupleAK4chs 	= process.qgMiniTupleAK4.clone(jetsInputTag = 'ak4PFJetsCHS', jec = 'ak4PFCHSL1FastL2L3', csvInputTag = 'ak4CHSCombinedInclusiveSecondaryVertexV2BJetTags')#, qgVariablesInputTag = 'QGTaggerAK4chs')
 
 # The path: jet sequence + b-tagging + (QGTagger) + qgMiniTuple for every jet collection
-process.p = cms.Path(process.myRecoPFJets * process.qgMiniTupleAK4 * process.qgMiniTupleAK4chs)
+process.p = cms.Path(process.myRecoPFJets * 
+                     process.ak4BTagging * process.ak4CHSBTagging *
+                     process.qgMiniTupleAK4 * process.qgMiniTupleAK4chs
+)

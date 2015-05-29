@@ -186,7 +186,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     float deltaRmin = 999;
     auto matchedGenParticle = genParticles->end();
     for(auto genParticle = genParticles->begin(); genParticle != genParticles->end(); ++genParticle){
-      if(genParticle->status() != (pythia6? 3 : 23)) continue; 							//status 3 (pythia6) / status 23 (pythia8) for outgoing particles from the hardest subprocess
+      if(genParticle->fromHardProcessBeforeFSR()) continue; 							//New status flag, supposed to be similar to status 3 (pythia6) / status 23 (pythia8)
       if(abs(genParticle->pdgId()) > 5 && abs(genParticle->pdgId()) != 21) continue;				//Only keep quarks and gluons
       float thisDeltaR = reco::deltaR(*genParticle, *jet);
       if(thisDeltaR < deltaRmin){

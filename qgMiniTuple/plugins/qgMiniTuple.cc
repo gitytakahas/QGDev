@@ -67,7 +67,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::EDGetTokenT<edm::ValueMap<float>> 		qgToken, axis2Token, ptDToken;
       edm::EDGetTokenT<edm::ValueMap<int>> 		multToken;*/
       const double 					minJetPt, deltaRcut;
-      const bool 					pythia6, useQC;
+      const bool 					useQC;
 
       const JetCorrector 				*JEC;
       edm::Service<TFileService> 			fs;
@@ -99,7 +99,6 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
   jecService( 									iConfig.getParameter<std::string>("jec")),
   minJetPt(									iConfig.getUntrackedParameter<double>("minJetPt", 20.)),
   deltaRcut(									iConfig.getUntrackedParameter<double>("deltaRcut", 0.3)),
-  pythia6(									iConfig.getUntrackedParameter<bool>("pythia6", false)),
   useQC(									iConfig.getUntrackedParameter<bool>("useQualityCuts", false))
 {
   weStillNeedToCheckJets	  = true;

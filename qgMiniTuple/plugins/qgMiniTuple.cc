@@ -80,7 +80,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       std::vector<float> *closebyJetdR, *closebyJetPt;
 
       bool weStillNeedToCheckJets, weAreUsingPatJets;
-      bool weStillNeedToCheckJetCandidates, weAreUsingPackedCandidates; 
+      bool weStillNeedToCheckJetCandidates, weAreUsingPackedCandidates;
 };
 
 
@@ -137,7 +137,8 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
   edm::Handle<double> 				rhoHandle;						iEvent.getByToken(rhoToken, 		rhoHandle);
   edm::Handle<reco::GenJetCollection> 		genJets;						iEvent.getByToken(genJetsToken, 	genJets);
   edm::Handle<reco::GenParticleCollection> 	genParticles;						iEvent.getByToken(genParticlesToken, 	genParticles);
-  edm::Handle<reco::JetTagCollection> 		bTagHandle;		if(!isPatJetCollection(jets)) 	iEvent.getByToken(bTagToken, 		bTagHandle);
+  edm::Handle<reco::JetTagCollection> 		bTagHandle;		if(!isPatJetCollection(jets))
+                                                                        if(!csvInputTag.label().empty())iEvent.getByToken(bTagToken, 		bTagHandle);
 /*edm::Handle<edm::ValueMap<float>> 		qgHandle;		if(!isPatJetCollection(jets))	iEvent.getByToken(qgToken, 		qgHandle);
   edm::Handle<edm::ValueMap<float>> 		axis2Handle; 		if(!isPatJetCollection(jets))	iEvent.getByToken(axis2Token, 		axis2Handle);
   edm::Handle<edm::ValueMap<float>> 		ptDHandle;  		if(!isPatJetCollection(jets))	iEvent.getByToken(multToken, 		multHandle);
@@ -162,7 +163,6 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     auto jet3 = genJets->begin() + 2;
     balanced = (jet3->pt() < 0.15*(jet1->pt()+jet2->pt()));
   } else balanced = true;
-
 
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
     if(jet == jets->begin() + 2) balanced = false;
@@ -225,7 +225,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
       edm::RefToBase<reco::Jet> jetRef(edm::Ref<edm::View<reco::Jet>>(jets, (jet - jets->begin())));
       auto recoJet 	= static_cast<const reco::PFJet*>(&*jet);
       jetIdLevel	= jetId(recoJet) + jetId(recoJet, false, true) + jetId(recoJet, true); 
-      bTag		= (*bTagHandle)[jetRef];
+      bTag		= csvInputTag.label().empty() ? 0 : (*bTagHandle)[jetRef];
 /*    qg		= (*qgHandle)[jetRef];
       axis2		= (*axis2Handle)[jetRef];
       mult		= (*multHandle)[jetRef];

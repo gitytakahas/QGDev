@@ -37,12 +37,11 @@ class treeLooper{
 /*
  * Initialise tree with sample, jet type and (optional) location of tuples
  */
-treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTuple4/"){
+treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTupleSpring15/"){
   useBTagging = jetType.Contains("antib");
   jetType.ReplaceAll("_antib","");
 
-  if(file == "TTJets" || file.Contains("VBFHbb")) qgMiniTuple = new TChain("qgMiniTuple/qgMiniTuple");
-  else qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
+  qgMiniTuple = new TChain("qgMiniTuple"+jetType+"/qgMiniTuple");
 
   usePtHatBins = (file == "QCD_AllPtBins");
   if(usePtHatBins){

@@ -268,7 +268,7 @@ void binClass::printInfoOnPlot(TString binName, TString jetType){
 // Construct latex loop containing \bin, \min and \max variables
 void binClass::makeTexLoops(){
   for(int i = 0; i < varNames.size(); ++i){
-    ofstream output;
+    std::ofstream output;
     output.open((varNames[i] + "Bins.tex").Data());
     output << "\\foreach \\bin in {0,...," << getNBins(varNames[i]) - 1 << "}{" << std::endl;
     for(int j = 0; j < getNBins(varNames[i]); ++j){

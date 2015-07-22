@@ -1,40 +1,6 @@
 #include "binClass.h"
 
 /*
- * Same pt/eta binning as used in JME-13-002, though without rho binning
- * Note: jets with 2 < eta < 3 were excluded from training
- */
-binClass getJME13002Binning(){
-  binClass bins;
-  bins.setBinRange("eta", 	"#eta",			{0,2.5,4.7});
-  bins.setBinRange("pt" , 	"p_{T}",		bins.getBins(20, 20, 2000, true, {6500}));					// Function returns vector with 20 bins logarithmically spaced between 20 and 2000 + aditional bin {2000,6500}
-  bins.setBinRange("rho",	"#rho",			{0,9999});
-  bins.printBinRanges();
-
-  for(int j=10; j < bins.getNBins("pt"); ++j) bins.setLink("eta1_pt9_rho0", TString("eta1_pt") + j + "_rho0");				// Merge higher pt bins in forward region
-
-  return bins;
-}
-
-
-/*
- * Same pt/eta binning as used in FSQ-12-035
- */
-binClass getFSQ12035Binning(){
-  binClass bins;
-  bins.setBinRange("eta", 	"#eta",			{0,2,3,4.7});
-  bins.setBinRange("pt" , 	"p_{T}",		bins.getBins(20, 20, 2000, true, {6500}));
-  bins.setBinRange("rho",	"#rho",			{0,9999});
-  bins.printBinRanges();
-
-  for(int j=15; j < bins.getNBins("pt"); ++j) bins.setLink("eta1_pt14_rho0", TString("eta1_pt") + j + "_rho0");				// Merge higher pt bins jn jntermediate region
-  for(int j=10; j < bins.getNBins("pt"); ++j) bins.setLink("eta2_pt9_rho0",  TString("eta2_pt") + j + "_rho0");				// Merge higher pt bins jn forward region
-
-  return bins;
-}
-
-
-/*
  * Finer eta binning
  */
 binClass getSmallEtaBinning(){
@@ -57,13 +23,13 @@ binClass getSmallEtaBinning(){
 
 
 /*
- * Binning as used in QGL_v1.db: smallEtaBinning + rho bins in the forward + weights applied in higher pt bins
+ * Similar to old V1 binning (as used for CSA14 training), but adapted for Spring15dr asympt25ns flat QCD training 
  */
-binClass getV1Binning(){
+binClass getV2Binning(){
   binClass bins;
   bins.setBinRange("eta", 	"#eta",			{0,1.3,1.5,1.8,2.1,2.4,2.7,3,4.7});
   bins.setBinRange("pt" , 	"p_{T}",		bins.getBins(20, 20, 2000, true, {6500}));
-  bins.setBinRange("rho",	"#rho",			{0,15,20,25,30,9999});								// The rho binning was set with spring14dr PU40bx50 in mind, so it's certainly outdated
+  bins.setBinRange("rho",	"#rho",			{0,8,11,14,17,9999});								// Very preliminary binning for spring15dr asympt25ns rho distribution (peaks around ~12)
   bins.printBinRanges();
 
   for(int i=0; i < 5; ++i){														// No rho binning needed in the central (eta < 2.4) as rho dependencies are very small
@@ -80,9 +46,6 @@ binClass getV1Binning(){
       bins.setLink(TString("eta") + i + "_pt" + j + "_rho2", TString("eta") + i + "_pt" + j + "_rho4");					// is again something which can be solved by more statistics
     }
   }
-  bins.setLink("eta5_pt13_rho3", "eta5_pt13_rho4");											// A couple of other low statistics bins
-  bins.setLink("eta6_pt3_rho3",  "eta6_pt3_rho4");
-  bins.setLink("eta6_pt12_rho3", "eta6_pt12_rho4");
 
   for(int k=0; k < bins.getNBins("rho"); ++k){
     for(int j=9;  j < bins.getNBins("pt"); ++j) bins.setLink(TString("eta7_pt8_rho")  + k, TString("eta7_pt") + j + "_rho" + k);	// Merge high pt bins jn forward (no or low statistics)
@@ -130,9 +93,9 @@ binClass getV1Binning(){
 
 
 /*
- * Experimental V2: try to introduce overlapping bins to get smoother transitions
+ * Experimental binning (formerly called v2): try to introduce overlapping bins to get smoother transitions
  */
-binClass getV2Binning(bool PU40bx50 = false){
+binClass getExperimentalBinning(bool PU40bx50 = false){
   binClass bins;
   bins.setBinRange("eta", 	"#eta",			{0,1.1,1.3,1.5,1.7,1.9,2.1,2.3,2.5,2.7,3,4.7});						// Small bins in the HF region in combination with the neighbour method result in smooth transitions
   bins.setBinRange("pt" , 	"p_{T}",		bins.getBins(20, 20, 2000, true, {6500}));

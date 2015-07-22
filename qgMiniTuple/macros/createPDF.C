@@ -28,19 +28,18 @@ TString switchQG(TString inputBin){
 
 // Main function to create the pdf's
 int main(int argc, char**argv){
-  TString version = "v2_PU40bx50";
+  TString version = "v2";
 
   // Define binning for pdfs (details and more options in binningConfigurations.h)
   binClass bins;
-  if(version.Contains("v1")) 	bins = getV1Binning();
-  if(version.Contains("v2")) 	bins = getV2Binning(version.Contains("PU40bx50"));
+  if(version.Contains("v2")) 		bins = getV2Binning();
   else return 1;
 
   // For different jet types (if _antib is added bTag is applied)
-  for(TString jetType : {"AK4chs","AK4chs_antib","AK4","AK4_antib"}){
+  for(TString jetType : {"AK4chs","AK4chs_antib"}){ //,"AK4","AK4_antib"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
-    treeLooper t("QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14", jetType);						// Init tree (third argument is the directory path, if other than default in treeLooper.h)
+    treeLooper t("QCD_Pt-15to7000_TuneCUETP8M1_Flat_13TeV-pythia8_asympt25ns", jetType);				// Init tree (third argument is the directory path, if other than default in treeLooper.h)
     bins.setReference("pt",  &t.pt);											// Give the binning class a pointer to the variables used to bin in
     bins.setReference("eta", &t.eta);
     bins.setReference("rho", &t.rho);
@@ -71,9 +70,9 @@ int main(int argc, char**argv){
       TString type = (t.partonId == 21? "gluon" : "quark");								// Define q/g
       TString histName = "_" + type + "_" + binName;
 
-      pdfs["axis2" + histName]->Fill(t.axis2);										// "axis2" already contains the log
-      pdfs["mult"  + histName]->Fill(t.mult);
-      pdfs["ptD"   + histName]->Fill(t.ptD);
+      pdfs["axis2" + histName]->Fill(t.axis2, t.weight);								// "axis2" already contains the log
+      pdfs["mult"  + histName]->Fill(t.mult,  t.weight);
+      pdfs["ptD"   + histName]->Fill(t.ptD,   t.weight);
     }
 
     // Try to add statistics from neighbours (first make copy, so you don't get an iterative effect)
@@ -221,7 +220,7 @@ int main(int argc, char**argv){
 
 
     // Make file and write binnings
-    TFile *pdfFile = new TFile("../data/pdfQG_"+jetType + "_13TeV_" + version + ".root","RECREATE");
+    TFile *pdfFile = new TFile("pdfQG_"+jetType + "_13TeV_" + version + ".root","RECREATE");
     pdfFile->cd();
     bins.writeBinsToFile();
 

@@ -39,7 +39,7 @@ int main(int argc, char**argv){
   for(TString jetType : {"AK4chs","AK4chs_antib"}){ //,"AK4","AK4_antib"}){
     std::cout << "Building pdf's for " << jetType << "..." << std::endl;
 
-    treeLooper t("QCD_Pt-15to7000_TuneCUETP8M1_Flat_13TeV-pythia8_asympt25ns", jetType);				// Init tree (third argument is the directory path, if other than default in treeLooper.h)
+    treeLooper t("QCD_AllPtBins", jetType);										// Init tree (third argument is the directory path, if other than default in treeLooper.h)
     bins.setReference("pt",  &t.pt);											// Give the binning class a pointer to the variables used to bin in
     bins.setReference("eta", &t.eta);
     bins.setReference("rho", &t.rho);
@@ -117,11 +117,22 @@ int main(int argc, char**argv){
         }
       }
 
+
+      int leftBin3      = 0;												// Define region of the peak: most extreme bins which exceed 90% of the maximum
+      int rightBin3     = 0;												// We will check for bins within this region which go below 80%
+      for(int bin = 1; bin < pdf.second->GetNbinsX(); ++bin){								// In such cases the fluctuations are really high and a larger bin width is preferred
+        if(pdf.second->GetBinContent(bin) > pdf.second->GetMaximum()*0.9){						// (Maybe the thresholds could still be optimized a bit more though)
+          if(!leftBin3) leftBin3  = bin;
+          else          rightBin3 = bin;
+        }
+      }
+
       int emptyBins     = 0;
       int maxEmptyBins  = 0;
       for(int bin = 1; bin < pdf.second->GetNbinsX(); ++bin){
         if(     bin >= leftBin  && bin <= rightBin  && pdf.second->GetBinContent(bin) <= 0)                            ++emptyBins;
         else if(bin >= leftBin2 && bin <= rightBin2 && pdf.second->GetBinContent(bin) <= pdf.second->GetMaximum()*0.7) ++emptyBins;
+        else if(bin >= leftBin3 && bin <= rightBin3 && pdf.second->GetBinContent(bin) <= pdf.second->GetMaximum()*0.8) ++emptyBins;
         else {
           if(emptyBins > maxEmptyBins) maxEmptyBins = emptyBins;
           emptyBins = 0;
@@ -157,10 +168,10 @@ int main(int argc, char**argv){
         float contentG = tempG->GetBinContent(i);
         float width    = tempQ->GetBinWidth(i);
 
-        if((2*contentQ < tempQ->GetBinContent(i-1) && 2*contentQ < tempQ->GetBinContent(i+1)) ||			// Try to average out some extreme fluctuations
-           (2*contentG < tempG->GetBinContent(i-1) && 2*contentG < tempG->GetBinContent(i+1)) ||
-           (contentQ > 2*tempQ->GetBinContent(i-1) && contentQ < 2*tempQ->GetBinContent(i+1)) ||
-           (contentG > 2*tempG->GetBinContent(i-1) && contentG < 2*tempG->GetBinContent(i+1))){
+        if((1.5*contentQ < tempQ->GetBinContent(i-1) && 1.5*contentQ < tempQ->GetBinContent(i+1)) ||			// Try to average out some extreme fluctuations (i.e. only allow a difference of max 50% between two neighbouring bins)
+           (1.5*contentG < tempG->GetBinContent(i-1) && 1.5*contentG < tempG->GetBinContent(i+1)) ||
+           (contentQ < 1.5*tempQ->GetBinContent(i-1) && contentQ < 1.5*tempQ->GetBinContent(i+1)) ||
+           (contentG < 1.5*tempG->GetBinContent(i-1) && contentG < 1.5*tempG->GetBinContent(i+1))){
           if(i-1 > 0 && i+1 < pdf.second->GetNbinsX() + 1){
             contentQ += tempQ->GetBinContent(i-1) + tempQ->GetBinContent(i+1);
             contentG += tempG->GetBinContent(i-1) + tempG->GetBinContent(i+1);

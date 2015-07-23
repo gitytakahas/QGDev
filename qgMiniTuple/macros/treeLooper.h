@@ -45,11 +45,11 @@ treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = 
 
   usePtHatBins = (file == "QCD_AllPtBins");
   if(usePtHatBins){
-    ptHatBins = {"15to30","30to50","50to80","80to120","120to170","170to300","300to470","470to600","600to800","800to1000","1000to1400","1400to1800","1800to2400", "2400to3200","3200"};
-    ptHatMin  = { 15,      30,      50,      80,       120,       170,       300,       470,       600,       800,        1000,        1400,        1800,         2400,        3200};
-    nEvents   = { 2498841, 2449363, 2500315, 2500098,  2491398,   1490834,   1498032,   1498417,   1465278,   1500369,    1500642,     1500040,     2953210 ,     2958105,     2953431};
-    xsec      = { 2237e6,  1615e5,  2211e4,  3000114,  493200,    120300,    7475,      587.1,     167,       28.25,      8.195,       0.7346,      0.102,        0.00644,     0.000163};
-    for(TString ptHatBin : ptHatBins) 	qgMiniTuple->Add(qgMiniTuplesDir + "/qgMiniTuple_QCD_Pt-"+ ptHatBin +"_Tune4C_13TeV_pythia8.root", -1);
+    ptHatBins = {"15to30",    "30to50",   "50to80",  "80to120", "120to170", "170to300", "300to470", "470to600", "600to800", "800to1000", "1000to1400", "1400to1800", "1800to2400", "2400to3200", "3200"};
+    ptHatMin  = { 15,          30,         50,        80,        120,        170,        300,        470,        600,        800,         1000,         1400,         1800,         2400,         3200};
+    nEvents   = { 4942232,     4957245,    4978425,   3424782,   3452896,    3364368,    2933611,    1936832,    1964128,    1937216,     1487136,      197959,       193608,       194456,       192944};
+    xsec      = { 1837410000., 140932000., 19204300., 2762530.,  471100.,    117276.,    7823.,      648.,       186.9 ,     32.293 ,     9.4183,       0.84265,      0.114943,     0.00682981,   0.000165445};
+    for(TString ptHatBin : ptHatBins) 	qgMiniTuple->Add(qgMiniTuplesDir + "/qgMiniTuple_QCD_Pt-"+ ptHatBin +"_TuneCUETP8M1_13TeV-pythia8_asympt25ns.root", -1);
   } else if(file == "test"){	 	qgMiniTuple->Add("../test/qgMiniTuple.root", -1);
   } else 				qgMiniTuple->Add(qgMiniTuplesDir + "qgMiniTuple_" + file + ".root", -1);
 
@@ -113,8 +113,8 @@ void treeLooper::setWeight(){
     int ptIndex = 0;
     while(pt > ptHatMin[ptIndex]) ++ptIndex;
     int treeIndex = qgMiniTuple->GetTreeNumber();
-    if(pt < 10*ptHatMin[treeIndex]) weight = xsec[treeIndex]/nEvents[treeIndex];
-    else	                    weight = xsec[ptIndex]/nEvents[ptIndex];							// Avoid high weights from jets with pt >>> ptHat
+    if(pt < ptHatMin[treeIndex])    weight = xsec[treeIndex]/nEvents[treeIndex];						// Apply weight to avoid too high contribution of jets with pt < pthat, those are radiated jets which could be wrongly matched
+    else	                    weight = xsec[ptIndex]/nEvents[ptIndex];							// Avoid high weights from jets with pt > ptHat, those could destroy the smoothness of the histrograms
   } else			    weight = 1.;
 }
 #endif

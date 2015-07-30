@@ -53,6 +53,9 @@ class qgMiniTuple : public edm::EDAnalyzer{
       bool 				isPatJetCollection(const edm::Handle<edm::View<reco::Jet>>& jets);
       bool 				isPackedCandidate(const reco::Candidate* candidate);
       template<class a, class b> int 	countInCone(a center, b objectsToCount);
+      template<class a> bool		isBalanced(a objects);
+      int 				getPileUp(edm::Handle<std::vector<PileupSummaryInfo>>& pupInfo);
+      reco::GenParticleCollection::const_iterator getMatchedGenParticle(const reco::Jet *jet, edm::Handle<reco::GenParticleCollection>& genParticles);
 
       edm::EDGetTokenT<edm::View<reco::Jet>> 		jetsToken;
       edm::EDGetTokenT<edm::View<reco::Candidate>> 	candidatesToken;
@@ -112,15 +115,6 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
 }
 
 
-template<class a, class b> int qgMiniTuple::countInCone(a center, b objectsToCount){
-  int counter = 0;
-  for(auto object = objectsToCount->begin(); object != objectsToCount->end(); ++object){
-    if(reco::deltaR(*center, *object) < deltaRcut) ++counter;
-  }
-  return counter;
-}
-
-
 /*
  * Prepare for analyzing the event: choose pat or reco jets
  */
@@ -146,32 +140,21 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
   if(!isPatJetCollection(jets)) JEC = JetCorrector::getJetCorrector(jecService, iSetup);
 
+  // Get number of primary vertices, pile-up and rho
   nPriVtxs 	= vertexCollection->size();
   rho 		= (float) *rhoHandle;
-  nPileUp 	= -1;
-  if(pupInfo.isValid()){
-    auto PVI = pupInfo->begin();
-    while(PVI->getBunchCrossing() != 0 && PVI != pupInfo->end()) ++PVI;
-    if(PVI != pupInfo->end()) nPileUp = PVI->getPU_NumInteractions();
-  }
+  nPileUp 	= getPileUp(pupInfo);
 
- 
-  if(genJets->size() > 2){
-    auto jet1 = genJets->begin();
-    auto jet2 = genJets->begin() + 1;
-    auto jet3 = genJets->begin() + 2;
-    balanced = (jet3->pt() < 0.15*(jet1->pt()+jet2->pt()));
-  } else balanced = true;
-
+  // Start jet loop (the tree is filled for each jet separately)
+  balanced = isBalanced(genJets);										// Check if first two generator jets are balanced
   for(auto jet = jets->begin();  jet != jets->end(); ++jet){
-    if(jet == jets->begin() + 2) balanced = false;
+    if(jet == jets->begin() + 2) balanced = false;								// 3rd jet and higher are never balanced
 
-    if(isPatJetCollection(jets)) pt = jet->pt();
-    else			 pt = jet->pt()*JEC->correction(*jet, iEvent, iSetup);
+    if(isPatJetCollection(jets)) pt = jet->pt();								// If miniAOD, jets are already corrected
+    else			 pt = jet->pt()*JEC->correction(*jet, iEvent, iSetup);				// If RECO, we correct them on the fly
     if(pt < minJetPt) continue;
 
-
-    // Closeby jet study variables
+    // Closeby jet study variables (i.e. dR and pt of other jets within 1.2)
     for(auto otherJet = jets->begin(); otherJet != jets->end(); ++otherJet){
       if(otherJet == jet) continue;
       float dR = reco::deltaR(*jet, *otherJet);
@@ -182,38 +165,27 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     }
 
     // Parton Id matching
-    float deltaRmin = 999;
-    auto matchedGenParticle = genParticles->end();
-    for(auto genParticle = genParticles->begin(); genParticle != genParticles->end(); ++genParticle){
-      if(genParticle->fromHardProcessBeforeFSR()) continue; 							//New status flag, supposed to be similar to status 3 (pythia6) / status 23 (pythia8)
-      if(abs(genParticle->pdgId()) > 5 && abs(genParticle->pdgId()) != 21) continue;				//Only keep quarks and gluons
-      float thisDeltaR = reco::deltaR(*genParticle, *jet);
-      if(thisDeltaR < deltaRmin){
-        deltaRmin = thisDeltaR;
-        matchedGenParticle = genParticle;
-      }
-    }
-    if(deltaRmin < deltaRcut){
-      matchedJet		= true;
+    auto matchedGenParticle = getMatchedGenParticle(&*jet, genParticles);
+    matchedJet = (matchedGenParticle != genParticles->end());
+    if(matchedJet){
       partonId 			= matchedGenParticle->pdgId();
       nJetsForGenParticle 	= countInCone(matchedGenParticle, jets);
       nGenJetsForGenParticle 	= countInCone(matchedGenParticle, genJets);
-      if(matchedGenParticle->numberOfMothers() == 1){								//Very experimental, but first tests shows it's good at finding W's and t's
-        motherId		= matchedGenParticle->mother()->pdgId();					//A bit more difficult for QCD, where it's sometimes a quark, decaying into
-        motherMass		= matchedGenParticle->mother()->mass();						//quark+gluon, and sometimes just a proton with a lot of other QCD mess and 
-      } else {													//sometimes 2 mothers (mostly two quarks recoiling each other, but sometimes
-        motherId		= 0;										//also two quarks going into two gluons etc...)
+      if(matchedGenParticle->numberOfMothers() == 1){								// Very experimental, but first tests shows it's good at finding W's and t's
+        motherId		= matchedGenParticle->mother()->pdgId();					// A bit more difficult for QCD, where it's sometimes a quark, decaying into
+        motherMass		= matchedGenParticle->mother()->mass();						// quark+gluon, and sometimes just a proton with a lot of other QCD mess and 
+      } else {													// sometimes 2 mothers (mostly two quarks recoiling each other, but sometimes
+        motherId		= 0;										// also two quarks going into two gluons etc...)
         motherMass		= 0;
       }
     } else {
-      matchedJet 		= false;
       partonId 			= 0; 
       nJetsForGenParticle 	= 0;
       nGenJetsForGenParticle 	= 0;
-      motherId		= 0;
+      motherId			= 0;
       motherMass		= 0;
+      continue;													// To keep the tuples small, we only save matched jets
     }
-    if(!matchedJet) continue;
     nGenJetsInCone 		= countInCone(jet, genJets);
 
     if(isPatJetCollection(jets)){
@@ -235,6 +207,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     axis2 			= -std::log(axis2);
     eta				= jet->eta();
 //  qg 				= qglcalc->computeQGLikelihood(pt, eta, rho, {(float) mult, ptD, axis2});
+    if(mult < 2) continue;  
 
     ptDoubleCone = 0;
     for(auto candidate = candidates->begin(); candidate != candidates->end(); ++candidate){
@@ -417,5 +390,60 @@ template <class jetClass> bool qgMiniTuple::jetId(const jetClass *jet, bool tigh
   return true;
 }
 
+
+/*
+ * Count objects around another object within dR < deltaRcut
+ */
+template<class a, class b> int qgMiniTuple::countInCone(a center, b objectsToCount){
+  int counter = 0;
+  for(auto object = objectsToCount->begin(); object != objectsToCount->end(); ++object){
+    if(reco::deltaR(*center, *object) < deltaRcut) ++counter;
+  }
+  return counter;
+}
+
+
+/*
+ * Are two leading objects in the collection balanced ?
+ */
+template<class a> bool qgMiniTuple::isBalanced(a objects){
+  if(objects->size() > 2){
+    auto object1 = objects->begin();
+    auto object2 = objects->begin() + 1;
+    auto object3 = objects->begin() + 2;
+    return (object3->pt() < 0.15*(object1->pt()+object2->pt()));
+  } else return true;
+}
+
+
+/*
+ * Get nPileUp
+ */
+int qgMiniTuple::getPileUp(edm::Handle<std::vector<PileupSummaryInfo>>& pupInfo){
+  if(!pupInfo.isValid()) return -1;
+  auto PVI = pupInfo->begin();
+  while(PVI->getBunchCrossing() != 0 && PVI != pupInfo->end()) ++PVI;
+  if(PVI != pupInfo->end()) return PVI->getPU_NumInteractions();
+  else return -1;
+}
+
+
+/*
+ * Parton Id matching (physics definition)
+ */
+reco::GenParticleCollection::const_iterator qgMiniTuple::getMatchedGenParticle(const reco::Jet *jet, edm::Handle<reco::GenParticleCollection>& genParticles){
+  float deltaRmin = 999;
+  auto matchedGenParticle = genParticles->end();
+  for(auto genParticle = genParticles->begin(); genParticle != genParticles->end(); ++genParticle){
+    if(!genParticle->isHardProcess()) continue;								// This status flag is exactly the pythia8 status-23 we need (i.e. the same as genParticles->status() == 23), probably also ok to use for other generators
+    if(abs(genParticle->pdgId()) > 5 && abs(genParticle->pdgId() != 21)) continue;			// Only consider udscb quarks and gluons
+    float thisDeltaR = reco::deltaR(*genParticle, *jet);
+    if(thisDeltaR < deltaRmin && thisDeltaR < deltaRcut){
+      deltaRmin = thisDeltaR;
+      matchedGenParticle = genParticle;
+    }
+  }
+  return matchedGenParticle;
+}
 
 DEFINE_FWK_MODULE(qgMiniTuple);

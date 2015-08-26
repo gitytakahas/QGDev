@@ -89,7 +89,7 @@ bool treeLooper::next(){
   if(eventNumber < maxEntries){
     qgMiniTuple->GetEntry(eventNumber++);
     eta = fabs(eta);
-    bTag = (useBTagging && bTagValue > 0.244);
+    bTag = (useBTagging && bTagValue > 0.423);
     additionalJets = 0;
     for(int i = 0; i < closebyJetdR->size(); ++i){
       if(closebyJetPt->at(i) < 20) continue;

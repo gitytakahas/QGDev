@@ -5,7 +5,7 @@ Repository for development of 13TeV quark-gluon tagger
 
 Making a new qgMiniTuple
 ------------------------
-* Use CMSSW_7_2_X or higher
+* Use CMSSW_7_4_X or higher
 * Extra variables can be added in QGDev/qgMiniTuple/plugins/qgMiniTuple.cc
 * cmsRun executable is QGDev/qgMiniTuple/test/qgMiniTuple_cfg.py or QGDev/qgMiniTuple/test/qgMiniTupleForMiniAOD_cfg.py
 

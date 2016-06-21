@@ -13,8 +13,8 @@
 int main(int argc, char**argv){
   system("rm -r ./plots/likelihoodValues/");
 
-  QGLikelihoodCalculator localQG("pdfQG_AK4chs_13TeV_v2.root");						// Init localQGLikelihoodCalculator
-  binClass bins = getV2Binning();									// Define binning for the plots (i.e. the same as used to create the pdf's)
+  QGLikelihoodCalculator localQG("pdfQG_AK4chs_13TeV_76X.root");						// Init localQGLikelihoodCalculator
+  binClass bins = get76XBinning();									// Define binning for the plots (i.e. the same as used to create the pdf's)
 
   std::map<TString, TH1D*> plots;
   for(TString binName : bins.getAllBinNames()){

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <map>
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
 #include "TH1D.h"
@@ -23,11 +24,14 @@ int main(int argc, char**argv){
   bool useDecorrelation		= false;
 
   // Define binning for plots
-//  binClass bins = getSmallEtaBinning();
-  binClass bins = getNoBinning();
+  //binClass bins = getSmallEtaBinning();
+  binClass bins = getTestBinning();
+  //binClass bins = getNoBinning();
+  std::vector<TString> types{"quark","gluon"};
 
   // For different jet types (if _antib is added bTag is applied)
-  for(TString file : {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_PU20"}){
+  //for(TString file : {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_PU20"}){
+  for(TString file : {"QCD_AllPtBins"}){
     for(TString jetType : {"AK4chs"}){
       std::cout << "Making plots for " << jetType << " in file " << file << "..." << std::endl;
       system("rm -rf plots/distributions/" + file + "/" + jetType);
@@ -38,14 +42,16 @@ int main(int argc, char**argv){
       bins.setReference("rho", &t.rho);
 
       // Init local localQGikelihoodCalculator
-      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
+      //QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_80X.root");
 
       // Creation of histos
       std::map<TString, TH1D*> plots;
       std::map<TString, TH2D*> plots2D;
       for(TString binName : bins.getAllBinNames()){
 //        for(TString type : {"quark","gluon","bquark","cquark","pu","undefined"}){
-        for(TString type : {"gluon","quark","quarkFromW","quarkFromT","quarkFromH","quarkFromZ","bQuark","bQuarkFromW","bQuarkFromT","bQuarkFromH","bQuarkFromZ"}){
+//        for(TString type : {"gluon","quark","quarkFromW","quarkFromT","quarkFromH","quarkFromZ","bQuark","bQuarkFromW","bQuarkFromT","bQuarkFromH","bQuarkFromZ"}){
+          for(TString type : types ) {
           TString histName = "_" + type + "_" + binName;
           plots["axis2"  + histName] 	= new TH1D("axis2" + histName, "axis2" + histName, 100, 1, 9);
           plots["ptD"    + histName]	= new TH1D("ptD"   + histName, "ptD"   + histName, 100, 0, 1);
@@ -110,6 +116,9 @@ int main(int argc, char**argv){
         float mult_l    = localQG.computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult});
 
         TString histName = "_" + type + "_" + binName;
+
+	if (std::find(types.begin(),types.end(),type) == types.end()) continue; // make sure type is in types
+
         plots["axis2"   + histName]->Fill(t.axis2, 	t.weight);
         plots["ptD"     + histName]->Fill(t.ptD, 	t.weight);
         plots["mult"    + histName]->Fill(t.mult, 	t.weight);
@@ -148,7 +157,8 @@ int main(int argc, char**argv){
         THStack stack(plot.first,";"+axisTitle+";"+(norm?"fraction of ":"")+"jets/bin");
         double maximum = 0;
 //        for(TString type : {"gluon","quark","bquark","cquark","pu","undefined"}){
-        for(TString type : {"gluon","quark","quarkFromW","quarkFromT","quarkFromH","quarkFromZ","bQuark","bQuarkFromH","bQuarkFromZ","bQuarkFromW","bQuarkFromT"}){
+//        for(TString type : {"gluon","quark","quarkFromW","quarkFromT","quarkFromH","quarkFromZ","bQuark","bQuarkFromH","bQuarkFromZ","bQuarkFromW","bQuarkFromT"}){
+          for(TString type : types){
           TString histName = plot.first; histName.ReplaceAll("gluon", type);
           if(plots[histName]->GetEntries() == 0) continue;
 //          int color = (type == "gluon"? 46 : (type == "quark"? 38 : (type == "bquark"? 32 : (type == "cquark" ? 42 : (type == "pu" ? 39 : 49)))));
@@ -185,7 +195,7 @@ int main(int argc, char**argv){
           if(overlay && plots[histName]->GetMaximum() > maximum) maximum = plots[histName]->GetMaximum();
         }
         if(!maximum) continue;
-        stack.Draw(overlay ? "nostack" : "");
+        stack.Draw(overlay ? "nostack HIST" : "HIST");
         if(overlay) stack.SetMaximum(maximum*1.1);
         stack.GetXaxis()->CenterTitle();
         stack.GetYaxis()->CenterTitle();

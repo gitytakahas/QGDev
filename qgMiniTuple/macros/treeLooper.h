@@ -37,7 +37,7 @@ class treeLooper{
 /*
  * Initialise tree with sample, jet type and (optional) location of tuples
  */
-treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~tomc/public/merged/QGMiniTupleSpring15/"){
+treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = "~amarini/public/merged/QGMiniTuple80X/"){
   useBTagging = jetType.Contains("antib");
   jetType.ReplaceAll("_antib","");
 
@@ -49,7 +49,13 @@ treeLooper::treeLooper(TString file, TString jetType, TString qgMiniTuplesDir = 
     ptHatMin  = { 15,          30,         50,        80,        120,        170,        300,        470,        600,        800,         1000,         1400,         1800,         2400,         3200};
     nEvents   = { 4942232,     4957245,    4978425,   3424782,   3452896,    3364368,    2933611,    1936832,    1964128,    1937216,     1487136,      197959,       193608,       194456,       192944};
     xsec      = { 1837410000., 140932000., 19204300., 2762530.,  471100.,    117276.,    7823.,      648.,       186.9 ,     32.293 ,     9.4183,       0.84265,      0.114943,     0.00682981,   0.000165445};
-    for(TString ptHatBin : ptHatBins) 	qgMiniTuple->Add(qgMiniTuplesDir + "/qgMiniTuple_QCD_Pt-"+ ptHatBin +"_TuneCUETP8M1_13TeV-pythia8_asympt25ns.root", -1);
+    //for(TString ptHatBin : ptHatBins) 	qgMiniTuple->Add(qgMiniTuplesDir + "/qgMiniTuple_QCD_Pt-"+ ptHatBin +"_TuneCUETP8M1_13TeV-pythia8_asympt25ns.root", -1);
+    for(TString ptHatBin : ptHatBins) {
+	    if (ptHatBin =="15to30") continue ;// no ntuple at the moment
+	    if (ptHatBin =="1800to2400") continue ;// no ntuple at the moment
+	    if (ptHatBin =="2400to3200") continue ;// no ntuple at the moment
+	    qgMiniTuple->Add(qgMiniTuplesDir + "/qgMiniTuple_QCD_Pt_"+ ptHatBin +"_TuneCUETP8M1_13TeV_pythia8.root", -1);
+    }
   } else if(file == "test"){	 	qgMiniTuple->Add("../test/qgMiniTuple.root", -1);
   } else 				qgMiniTuple->Add(qgMiniTuplesDir + "qgMiniTuple_" + file + ".root", -1);
 

@@ -30,12 +30,12 @@ TString replace(TString input, TString a, TString b){
 
 
 int main(int argc, char**argv){
-//std::vector<TString> files	= {"QCD_AllPtBins"};
-  std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
+  std::vector<TString> files	= {"QCD_AllPtBins"};
+  //std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
   std::vector<TString> jetTypes = {"AK4chs"};
 
   binClass bins = getCentralPtSlices();											// This is the binning/selection of the ROC plots
-  binClass pdfBins = getV2Binning();											// This is the binning of the pdf set with the finest binning
+  binClass pdfBins = get76XBinning();											// This is the binning of the pdf set with the finest binning
 
   // Loop over different samples and jet types
   for(TString file : files){
@@ -53,8 +53,8 @@ int main(int argc, char**argv){
 
       // Init local QGLikelihoodCalculators to compare
       std::map<TString, QGLikelihoodCalculator*> localQG;
-      localQG["1"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_v1_PU40bx50.root");
-      localQG["2"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_v2_PU40bx50.root");
+      localQG["76X"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_76X.root");
+      //localQG["2"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_v2_PU40bx50.root");
 
       // Creation of histos
       std::vector<TString> rocTypes; for(auto& l : localQG) rocTypes.push_back("_" + l.first); rocTypes.push_back("");
@@ -63,8 +63,8 @@ int main(int argc, char**argv){
         for(TString pdfBin : pdfBins.getAllBinNames()){
           bool createHist = true;
           for(TString binVar : {"pt","eta","rho","aj"}){
-            if(pdfBins.getLowerEdge(pdfBin, binVar) >= bins.getUpperEdge(binName, binVar)) createHist = false;		// Try to minimize memory consumption: create only histograms if two bins are overlapping with each other (could get really heavy otherwise)
-            if(pdfBins.getUpperEdge(pdfBin, binVar) <= bins.getLowerEdge(binName, binVar)) createHist = false;
+            //if(pdfBins.getLowerEdge(pdfBin, binVar) >= bins.getUpperEdge(binName, binVar)) createHist = false;		// Try to minimize memory consumption: create only histograms if two bins are overlapping with each other (could get really heavy otherwise)
+            //if(pdfBins.getUpperEdge(pdfBin, binVar) <= bins.getLowerEdge(binName, binVar)) createHist = false;
           }
           if(!createHist) continue;
           for(TString type : {"quark","gluon"}){
@@ -100,9 +100,9 @@ int main(int argc, char**argv){
         else continue;
 
         TString histName = "_" + type + "_" + binName + pdfBin;
-        plots["axis2"   + histName]->Fill(t.axis2, 												t.weight);
-        plots["ptD"     + histName]->Fill(t.ptD, 												t.weight);
-        plots["mult"    + histName]->Fill(t.mult, 												t.weight);
+        plots["axis2"   + histName]->Fill(t.axis2, t.weight);
+        plots["ptD"     + histName]->Fill(t.ptD,   t.weight);
+        plots["mult"    + histName]->Fill(t.mult,  t.weight);
         for(auto& l : localQG){
           plots["qg_"      + l.first + histName]->Fill(l.second->computeQGLikelihood(t.pt, t.eta, t.rho, {(float) t.mult, t.ptD, t.axis2}),	t.weight);
           plots["axis2_"   + l.first + histName]->Fill(l.second->computeQGLikelihood(t.pt, t.eta, t.rho, {-1, -1, t.axis2}), 			t.weight);
@@ -169,8 +169,7 @@ int main(int argc, char**argv){
             if(var == "axis2") 	entryName = "-log(#sigma_{2})";
             if(var == "ptD") 	entryName = "p_{T}D";
             if(var == "mult") 	entryName = "multiplicity";
-            if(type == "_1")	entryName += " likelihood v1";
-            if(type == "_2")	entryName += " likelihood v2";
+            if(type == "_76X")	entryName += " likelihood 76X";
             l.AddEntry(roc[var+type], entryName, "l");
 
             if(roc.size() == 1){

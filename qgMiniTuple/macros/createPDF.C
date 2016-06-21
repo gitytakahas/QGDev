@@ -28,11 +28,12 @@ TString switchQG(TString inputBin){
 
 // Main function to create the pdf's
 int main(int argc, char**argv){
-  TString version = "v2";
+  TString version = "80X";
 
   // Define binning for pdfs (details and more options in binningConfigurations.h)
   binClass bins;
   if(version.Contains("v2")) 		bins = getV2Binning();
+  if(version.Contains("80X")) 		bins = get76XBinning();
   else return 1;
 
   // For different jet types (if _antib is added bTag is applied)

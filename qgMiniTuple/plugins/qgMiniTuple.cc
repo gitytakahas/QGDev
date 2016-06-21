@@ -64,6 +64,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       edm::EDGetTokenT<reco::GenJetCollection> 		genJetsToken;
       edm::EDGetTokenT<reco::GenParticleCollection> 	genParticlesToken;
       edm::EDGetTokenT<reco::JetTagCollection> 		bTagToken;
+      edm::EDGetTokenT<std::vector<PileupSummaryInfo> > puToken;
       edm::InputTag					csvInputTag;
       std::string 					jecService;
 /*    edm::InputTag 					qgVariablesInputTag;
@@ -97,6 +98,7 @@ qgMiniTuple::qgMiniTuple(const edm::ParameterSet& iConfig) :
   vertexToken(    	consumes<reco::VertexCollection>(			iConfig.getParameter<edm::InputTag>("vertexInputTag"))),
   genJetsToken(    	consumes<reco::GenJetCollection>(			iConfig.getParameter<edm::InputTag>("genJetsInputTag"))),
   genParticlesToken(    consumes<reco::GenParticleCollection>(			iConfig.getParameter<edm::InputTag>("genParticlesInputTag"))),
+  puToken ( 		consumes<std::vector<PileupSummaryInfo> > (edm::InputTag("slimmedAddPileupInfo")) ),
   csvInputTag(									iConfig.getParameter<edm::InputTag>("csvInputTag")),
 //qgVariablesInputTag(  							iConfig.getParameter<edm::InputTag>("qgVariablesInputTag")),
   jecService( 									iConfig.getParameter<std::string>("jec")),
@@ -125,7 +127,7 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
   edm::Handle<edm::View<reco::Jet>> 		jets;							iEvent.getByToken(jetsToken, 		jets);
   edm::Handle<edm::View<reco::Candidate>> 	candidates;						iEvent.getByToken(candidatesToken, 	candidates);
-  edm::Handle<std::vector<PileupSummaryInfo>> 	pupInfo;						iEvent.getByLabel("addPileupInfo", 	pupInfo);
+  edm::Handle<std::vector<PileupSummaryInfo>> 	pupInfo;						iEvent.getByToken(puToken, 	pupInfo);
   edm::Handle<reco::VertexCollection> 		vertexCollection;					iEvent.getByToken(vertexToken, 		vertexCollection);
   edm::Handle<double> 				rhoHandle;						iEvent.getByToken(rhoToken, 		rhoHandle);
   edm::Handle<reco::GenJetCollection> 		genJets;						iEvent.getByToken(genJetsToken, 	genJets);

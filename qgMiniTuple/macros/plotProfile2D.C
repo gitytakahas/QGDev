@@ -77,7 +77,7 @@ void makeProfile2D(TString xAndyVar, bool useBins = false, bool extraBinInformat
 //    int& yAxisVar 	= (xAndyVar.Contains("_nPileUp"?		t.nPileUp : t.nPriVtxs));
 
       // Init local QGLikelihoodCalculator
-      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_76X.root");
 
       // Creation of histos
       std::map<TString, TProfile2D*> plots;

@@ -36,10 +36,11 @@ int main(int argc, char**argv){
  for(bool useBins : {true}){ 
  for(TString xVar : {"rho"}){
 
-//  std::vector<TString> files	= {"QCD_AllPtBins"};
-  std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
+  std::vector<TString> files	= {"QCD_AllPtBins"};
+  //std::vector<TString> files	= {"QCD_Pt-15to3000_Tune4C_Flat_13TeV_pythia8_S14"};
 //std::vector<TString> files	= {"TTJets"};
-  std::vector<TString> jetTypes = {"AK4","AK4chs"};
+  //std::vector<TString> jetTypes = {"AK4","AK4chs"};
+  std::vector<TString> jetTypes = {"AK4chs"};
 
   binClass bins = getSmallEtaBinning();
   bins.printBinRanges();
@@ -71,7 +72,7 @@ int main(int argc, char**argv){
 //    int& xAxisVar =   (xVar == "nPileUp" ? 			t.nPileUp : t.nPriVtxs);
 
       // Init local QGLikelihoodCalculator
-      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_v1.root");
+      QGLikelihoodCalculator localQG("../data/pdfQG_" + jetType + "_13TeV_76X.root");
 
       // Creation of histos
       std::map<TString, TProfile*> plots;

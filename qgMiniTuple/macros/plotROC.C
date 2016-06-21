@@ -56,14 +56,16 @@ int main(int argc, char**argv){
       localQG["76X"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_76X.root");
       localQG["80X"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_80X.root");
 
-      // Creation of histos
-      std::vector<TString> rocTypes; for(auto& l : localQG) rocTypes.push_back("_" + l.first); rocTypes.push_back("");
+      // Keep track of different ROC types
+      std::vector<TString> rocTypes;
+      rocTypes.push_back("");							// Empty string means these are ROC curves of the variables themselves
+      for(auto& l : localQG) rocTypes.push_back("_" + l.first);			// These are ROC curves for each of the defined localQG
+
+      // Creation of histos: for each type, plotting bin and pdf bin
       std::map<TString, TH1D*> plots;
       for(TString binName : bins.getAllBinNames()){
-        for(TString pdfBin : pdfBins.getAllBinNames()){
           for(TString type : {"quark","gluon"}){
-            TString histName = "_" + type + "_" + binName + pdfBin;
-            std::cout << histName << std::endl;
+            TString histName = "_" + type + "_" + binName;
             plots["axis2"  + histName] 	= new TH1D("axis2"  + histName, "axis2"     + histName, 200, 0, 8);
             plots["ptD"    + histName]	= new TH1D("ptD"    + histName, "ptD"       + histName, 200, 0, 1);
             plots["mult"   + histName]	= new TH1D("mult"   + histName, "mult"      + histName, 140, 2.5, 142.5);
@@ -74,7 +76,6 @@ int main(int argc, char**argv){
               }
             }
           }
-        }
       }
 
       // Fill histos
@@ -94,7 +95,7 @@ int main(int argc, char**argv){
         else if(fabs(t.partonId) < 4) 	type = "quark";
         else continue;
 
-        TString histName = "_" + type + "_" + binName + pdfBin;
+        TString histName = "_" + type + "_" + binName;
         plots["axis2"   + histName]->Fill(t.axis2, t.weight);
         plots["ptD"     + histName]->Fill(t.ptD,   t.weight);
         plots["mult"    + histName]->Fill(t.mult,  t.weight);
@@ -107,28 +108,8 @@ int main(int argc, char**argv){
       }
       for(auto& plot : plots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX() + 1));
 
-      // We have normalized plots for every category, now combine them to the larger bins we use to compare the ROC, and normalize again
-      std::map<TString, TH1D*> normalizedPlots;
-      for(TString binName : bins.getAllBinNames()){
-        for(TString type : {"quark","gluon"}){
-          for(TString var : {"qg","axis2","ptD","mult"}){
-            for(TString rocType : rocTypes){
-              if(var + rocType == "qg") continue;
-              for(TString pdfBin : pdfBins.getAllBinNames()){
-                TString histName = var + rocType + "_" + type + "_" + binName;
-                if(!plots[histName + pdfBin]) continue;
-                if(!plots[histName + pdfBin]->GetEntries()) continue;
-                if(!normalizedPlots[histName]) normalizedPlots[histName] = (TH1D*) plots[histName + pdfBin]->Clone();
-                else                           normalizedPlots[histName]->Add(plots[histName + pdfBin]);
-              }
-            }
-          }
-        }
-      }
-      for(auto& plot : normalizedPlots) plot.second->Scale(1./plot.second->Integral(0, plot.second->GetNbinsX() + 1));
-
       // Stacking, cosmetics and saving
-      for(auto& plot : normalizedPlots){
+      for(auto& plot : plots){
         if(!plot.first.Contains("gluon") || !plot.first.Contains("qg" + rocTypes[1]) || plot.second->GetEntries() == 0) continue;
         TCanvas c;
 
@@ -141,8 +122,8 @@ int main(int argc, char**argv){
           for(TString type : rocTypes){
             if(var.Contains("qg")  && type == "") continue;
             if(!var.Contains("qg") && type != "") continue; // skip single-variable likelihoods
-            TH1D *pdfGluon = normalizedPlots[replace(plot.first,"qg" + rocTypes[1], var+type)]; 
-            TH1D *pdfQuark = normalizedPlots[switchQG(replace(plot.first,"qg" + rocTypes[1], var+type))];
+            TH1D *pdfGluon = plots[replace(plot.first,"qg" + rocTypes[1], var+type)]; 
+            TH1D *pdfQuark = plots[switchQG(replace(plot.first,"qg" + rocTypes[1], var+type))];
             if(!pdfQuark || !pdfGluon) continue;
 
             roc[var+type] = new TGraph(plot.second->GetNbinsX() + 2);
@@ -157,8 +138,7 @@ int main(int argc, char**argv){
             if(var == "ptD")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kMagenta+4 : kAzure+10);
             if(var == "mult")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kRed :       kOrange);
             if(var == "qg")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kGray :      kBlack);
-            roc[var+type]->SetLineWidth(type == rocTypes[0] ? 3. : 1.);
-            roc[var+type]->SetLineStyle(type == rocTypes[3] ? 3 : 1);
+            roc[var+type]->SetLineWidth(type == rocTypes[1] ? 3. : 1.);
 
 
             TString entryName = "quark-gluon";
@@ -194,7 +174,6 @@ int main(int argc, char**argv){
       }
 
       for(auto& plot : plots) delete plot.second;
-      for(auto& plot : normalizedPlots) delete plot.second;
       for(auto& l : localQG) delete l.second;
     }
   }

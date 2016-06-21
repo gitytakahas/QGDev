@@ -35,7 +35,6 @@ int main(int argc, char**argv){
   std::vector<TString> jetTypes = {"AK4chs"};
 
   binClass bins = getCentralPtSlices();											// This is the binning/selection of the ROC plots
-  binClass pdfBins = get76XBinning();											// This is the binning of the pdf set with the finest binning
 
   // Loop over different samples and jet types
   for(TString file : files){
@@ -47,9 +46,6 @@ int main(int argc, char**argv){
       bins.setReference("pt",  &t.pt);
       bins.setReference("eta", &t.eta);
       bins.setReference("rho", &t.rho);
-      pdfBins.setReference("pt",  &t.pt);
-      pdfBins.setReference("eta", &t.eta);
-      pdfBins.setReference("rho", &t.rho);
 
       // Init local QGLikelihoodCalculators to compare, now we are comparing the 76X pdf's with the 80X pdf's
       std::map<TString, QGLikelihoodCalculator*> localQG;
@@ -79,10 +75,9 @@ int main(int argc, char**argv){
       }
 
       // Fill histos
-      TString binName, pdfBin;
+      TString binName;
       while(t.next()){
         if(!bins.getBinName(binName)) 	continue;									// Find bin and return false if outside ranges 
-        if(!pdfBins.getBinName(pdfBin)) continue;									// Find bin and return false if outside ranges 
         if(t.jetIdLevel < 3) 		continue;									// Select tight jets
         if(!t.matchedJet) 		continue; 									// Only matched jets
         if(t.bTag) 			continue;									// Anti-b tagging
@@ -134,12 +129,10 @@ int main(int argc, char**argv){
               roc[var+type]->SetPoint(bin, gluonRej, quarkEff);
             }
 
-            if(var == "axis2")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kGreen+4   : kYellow);
-            if(var == "ptD")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kMagenta+4 : kAzure+10);
-            if(var == "mult")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kRed :       kOrange);
-            if(var == "qg")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kGray :      kBlack);
-            roc[var+type]->SetLineWidth(type == rocTypes[1] ? 3. : 1.);
-
+            if(var == "axis2")	roc[var+type]->SetLineColor(type != rocTypes[0] ? kGreen+4   : kYellow);
+            if(var == "ptD")	roc[var+type]->SetLineColor(type != rocTypes[0] ? kMagenta+4 : kAzure+10);
+            if(var == "mult")	roc[var+type]->SetLineColor(type != rocTypes[0] ? kOrange    : kRed);
+            if(var == "qg")	roc[var+type]->SetLineColor(type != rocTypes[1] ? kBlack     : kGray);
 
             TString entryName = "quark-gluon";
             if(var == "axis2") 	entryName = "-log(#sigma_{2})";

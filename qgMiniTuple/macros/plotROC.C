@@ -51,24 +51,19 @@ int main(int argc, char**argv){
       pdfBins.setReference("eta", &t.eta);
       pdfBins.setReference("rho", &t.rho);
 
-      // Init local QGLikelihoodCalculators to compare
+      // Init local QGLikelihoodCalculators to compare, now we are comparing the 76X pdf's with the 80X pdf's
       std::map<TString, QGLikelihoodCalculator*> localQG;
       localQG["76X"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_76X.root");
-      //localQG["2"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_v2_PU40bx50.root");
+      localQG["80X"] = new QGLikelihoodCalculator("../data/pdfQG_" + jetType + "_13TeV_80X.root");
 
       // Creation of histos
       std::vector<TString> rocTypes; for(auto& l : localQG) rocTypes.push_back("_" + l.first); rocTypes.push_back("");
       std::map<TString, TH1D*> plots;
       for(TString binName : bins.getAllBinNames()){
         for(TString pdfBin : pdfBins.getAllBinNames()){
-          bool createHist = true;
-          for(TString binVar : {"pt","eta","rho","aj"}){
-            //if(pdfBins.getLowerEdge(pdfBin, binVar) >= bins.getUpperEdge(binName, binVar)) createHist = false;		// Try to minimize memory consumption: create only histograms if two bins are overlapping with each other (could get really heavy otherwise)
-            //if(pdfBins.getUpperEdge(pdfBin, binVar) <= bins.getLowerEdge(binName, binVar)) createHist = false;
-          }
-          if(!createHist) continue;
           for(TString type : {"quark","gluon"}){
             TString histName = "_" + type + "_" + binName + pdfBin;
+            std::cout << histName << std::endl;
             plots["axis2"  + histName] 	= new TH1D("axis2"  + histName, "axis2"     + histName, 200, 0, 8);
             plots["ptD"    + histName]	= new TH1D("ptD"    + histName, "ptD"       + histName, 200, 0, 1);
             plots["mult"   + histName]	= new TH1D("mult"   + histName, "mult"      + histName, 140, 2.5, 142.5);
@@ -144,7 +139,8 @@ int main(int argc, char**argv){
         std::map<TString, TGraph*> roc;
         for(TString var : {"qg","axis2","ptD","mult"}){
           for(TString type : rocTypes){
-            if(var.Contains("qg") && type == "") continue;
+            if(var.Contains("qg")  && type == "") continue;
+            if(!var.Contains("qg") && type != "") continue; // skip single-variable likelihoods
             TH1D *pdfGluon = normalizedPlots[replace(plot.first,"qg" + rocTypes[1], var+type)]; 
             TH1D *pdfQuark = normalizedPlots[switchQG(replace(plot.first,"qg" + rocTypes[1], var+type))];
             if(!pdfQuark || !pdfGluon) continue;
@@ -170,6 +166,7 @@ int main(int argc, char**argv){
             if(var == "ptD") 	entryName = "p_{T}D";
             if(var == "mult") 	entryName = "multiplicity";
             if(type == "_76X")	entryName += " likelihood 76X";
+            if(type == "_80X")	entryName += " likelihood 80X";
             l.AddEntry(roc[var+type], entryName, "l");
 
             if(roc.size() == 1){

@@ -50,6 +50,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void 			analyze(const edm::Event&, const edm::EventSetup&) override;
       template <class jetClass> bool 	jetId(const jetClass *jet, bool tight = false, bool medium = false);
       std::tuple<int, float, float> 	calcVariables(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC);
+      std::tuple<float, float, float,float> 	calcVariablesPuppi(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC);
       bool 				isPatJetCollection(const edm::Handle<edm::View<reco::Jet>>& jets);
       bool 				isPackedCandidate(const reco::Candidate* candidate);
       template<class a, class b> int 	countInCone(a center, b objectsToCount);
@@ -79,6 +80,7 @@ class qgMiniTuple : public edm::EDAnalyzer{
 //    QGLikelihoodCalculator 				*qglcalc;
 
       float rho, pt, eta, axis2, ptD, bTag, ptDoubleCone, motherMass;
+      float ptDW, axis2W, axis1W, multW;
       int nEvent, nPileUp, nPriVtxs, mult, partonId, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle, motherId;
       bool matchedJet, balanced;
       std::vector<float> *closebyJetdR, *closebyJetPt;
@@ -211,6 +213,10 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 //  qg 				= qglcalc->computeQGLikelihood(pt, eta, rho, {(float) mult, ptD, axis2});
     if(mult < 2) continue;  
 
+    std::tie(multW, ptDW, axis1W, axis2W) 	= calcVariablesPuppi(&*jet, vertexCollection);
+    axis2W 			= -std::log(axis2W);
+    axis1W 			= -std::log(axis1W);
+
     ptDoubleCone = 0;
     for(auto candidate = candidates->begin(); candidate != candidates->end(); ++candidate){
       if(reco::deltaR(*candidate, *jet) < 0.8) ptDoubleCone += candidate->pt();
@@ -250,6 +256,11 @@ void qgMiniTuple::beginJob(){
   tree->Branch("nJetsForGenParticle",   	&nJetsForGenParticle,   	"nJetsForGenParticle/I");
   tree->Branch("closebyJetdR",			"vector<float>",		&closebyJetdR);
   tree->Branch("closebyJetPt",			"vector<float>",		&closebyJetPt);
+  // puppi
+  tree->Branch("axis1W",			&axis1W,			"axis1W/F");
+  tree->Branch("axis2W",			&axis2W,			"axis2W/F");
+  tree->Branch("ptDW",				&ptDW,				"ptDW/F");
+  tree->Branch("multW",				&multW,				"multW/F");
 }
 
 
@@ -369,27 +380,95 @@ std::tuple<int, float, float> qgMiniTuple::calcVariables(const reco::Jet *jet, e
   return std::make_tuple(mult, ptD, axis2);
 }
 
+std::tuple<float, float, float,float > qgMiniTuple::calcVariablesPuppi(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC){
+  float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
+  float mult = 0;
+
+  //Loop over the jet constituents
+  for(auto daughter : jet->getJetConstituentsQuick()){
+
+      auto part = static_cast<const pat::PackedCandidate*>(daughter);
+
+      float w= part->puppiWeight();
+
+    mult += w;
+
+    float deta   = daughter->eta() - jet->eta();
+    float dphi   = reco::deltaPhi(daughter->phi(), jet->phi());
+    float partPt = daughter->pt();
+    float weight = partPt*partPt*w;
+
+    sum_weight   += weight;
+    sum_pt       += partPt * w;
+    sum_deta     += deta*weight;
+    sum_dphi     += dphi*weight;
+    sum_deta2    += deta*deta*weight;
+    sum_detadphi += deta*dphi*weight;
+    sum_dphi2    += dphi*dphi*weight;
+  }
+
+  //Calculate axis2 and ptD
+  float a = 0., b = 0., c = 0.;
+  float ave_deta = 0., ave_dphi = 0., ave_deta2 = 0., ave_dphi2 = 0.;
+  if(sum_weight > 0){
+    ave_deta  = sum_deta/sum_weight;
+    ave_dphi  = sum_dphi/sum_weight;
+    ave_deta2 = sum_deta2/sum_weight;
+    ave_dphi2 = sum_dphi2/sum_weight;
+    a         = ave_deta2 - ave_deta*ave_deta;                          
+    b         = ave_dphi2 - ave_dphi*ave_dphi;                          
+    c         = -(sum_detadphi/sum_weight - ave_deta*ave_dphi);                
+  }
+  float delta = sqrt(fabs((a-b)*(a-b)+4*c*c));
+  float axis2 = (a+b-delta > 0 ?  sqrt(0.5*(a+b-delta)) : 0);
+  float axis1 = (a+b-delta > 0 ?  sqrt(0.5*(a+b+delta)) : 0);
+  float ptD   = (sum_weight > 0 ? sqrt(sum_weight)/sum_pt : 0);
+  return std::make_tuple(mult, ptD, axis1,axis2);
+}
+
 
 /*
  * Calculate jetId for levels loose, medium and tight
  */
 template <class jetClass> bool qgMiniTuple::jetId(const jetClass *jet, bool tight, bool medium){
-  float jetEnergyUncorrected 		= jet->chargedHadronEnergy() + jet->neutralHadronEnergy() + jet->photonEnergy() +
-  					  jet->electronEnergy() + jet->muonEnergy() + jet->HFHadronEnergy() + jet->HFEMEnergy();
-  float neutralHadronEnergyFraction 	= (jet->neutralHadronEnergy() + jet->HFHadronEnergy())/jetEnergyUncorrected;
-  float neutralEmEnergyFraction 	= (jet->neutralEmEnergy())/jetEnergyUncorrected;
-  float chargedHadronEnergyFraction 	= (jet->chargedHadronEnergy())/jetEnergyUncorrected;
-  float chargedEmEnergyFraction 	= (jet->chargedEmEnergy())/jetEnergyUncorrected;
+    bool jetid = false;
+    const auto& j = *jet;
+    float NHF    = j.neutralHadronEnergyFraction();
+    float NEMF   = j.neutralEmEnergyFraction();
+    float CHF    = j.chargedHadronEnergyFraction();
+    float MUF    = j.muonEnergyFraction();
+    float CEMF   = j.chargedEmEnergyFraction();
+    int NumConst = j.chargedMultiplicity()+j.neutralMultiplicity();
+    int CHM      = j.chargedMultiplicity();
+    int NumNeutralParticle =j.neutralMultiplicity(); 
+    float eta = j.eta();
 
-  if(!(neutralHadronEnergyFraction 	< (tight ? 0.90 : (medium ? 0.95 : .99)))) 	return false;
-  if(!(neutralEmEnergyFraction 		< (tight ? 0.90 : (medium ? 0.95 : .99)))) 	return false;
-  if(!((jet->chargedMultiplicity() + jet->neutralMultiplicity()) > 1)) 			return false;
-  if(fabs(jet->eta()) < 2.4){
-    if(!(chargedHadronEnergyFraction > 0)) 						return false;
-    if(!(chargedEmEnergyFraction < .99)) 						return false;
-    if(!(jet->chargedMultiplicity() > 0)) 						return false;
-  }
-  return true;
+
+    // POG JetID loose, tight, tightLepVeto
+    if (not tight and not medium)
+    { // loose -- default
+        jetid=(NHF<0.99 && NEMF<0.99 && NumConst>1) && ((abs(eta)<=2.4 && CHF>0 && CHM>0 && CEMF<0.99) || abs(eta)>2.4) && abs(eta)<=2.7 ;
+        jetid = jetid or (NEMF<0.90 && NumNeutralParticle>2 && abs(eta)>2.7 && abs(eta)<=3.0 ) ;
+        jetid = jetid or (NEMF<0.90 && NumNeutralParticle>10 && abs(eta)>3.0 ) ;
+	return jetid;
+    }
+
+    if (medium) // no medium recommendation at the moment. https://twiki.cern.ch/twiki/bin/viewauth/CMS/JetID this is LOOSE
+    {
+        jetid=(NHF<0.99 && NEMF<0.99 && NumConst>1) && ((abs(eta)<=2.4 && CHF>0 && CHM>0 && CEMF<0.99) || abs(eta)>2.4) && abs(eta)<=2.7 ;
+        jetid = jetid or (NEMF<0.90 && NumNeutralParticle>2 && abs(eta)>2.7 && abs(eta)<=3.0 ) ;
+        jetid = jetid or (NEMF<0.90 && NumNeutralParticle>10 && abs(eta)>3.0 ) ;
+	return jetid;
+    }
+    if(tight)
+    {
+	
+        jetid = (NHF<0.90 && NEMF<0.90 && NumConst>1) && ((abs(eta)<=2.4 && CHF>0 && CHM>0 && CEMF<0.99) || abs(eta)>2.4) && abs(eta)<=2.7 ;
+        jetid = jetid or (NEMF<0.90 && NumNeutralParticle>2 && abs(eta)>2.7 && abs(eta)<=3.0 ) ;
+jetid = jetid or (NEMF<0.90 && NumNeutralParticle>10 && abs(eta)>3.0 ) ;
+	return jetid;
+    }	
+    return true;
 }
 
 

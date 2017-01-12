@@ -48,9 +48,8 @@ class qgMiniTuple : public edm::EDAnalyzer{
       virtual void 			beginJob() override;
       virtual void 			endJob() override;
       virtual void 			analyze(const edm::Event&, const edm::EventSetup&) override;
-      template <class jetClass> bool 	jetId(const jetClass *jet, bool tight = false, bool medium = false);
-      std::tuple<int, float, float> 	calcVariables(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC);
-      std::tuple<float, float, float,float> 	calcVariablesPuppi(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC);
+      template <class jetClass> bool 	jetId(const jetClass *jet, bool tight = false, bool loose = false);
+      std::tuple<int, int, int, float, float, float, float> 	calcVariables(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC);
       bool 				isPatJetCollection(const edm::Handle<edm::View<reco::Jet>>& jets);
       bool 				isPackedCandidate(const reco::Candidate* candidate);
       template<class a, class b> int 	countInCone(a center, b objectsToCount);
@@ -79,9 +78,8 @@ class qgMiniTuple : public edm::EDAnalyzer{
       TTree 						*tree;
 //    QGLikelihoodCalculator 				*qglcalc;
 
-      float rho, pt, eta, axis2, ptD, bTag, ptDoubleCone, motherMass;
-      float ptDW, axis2W, axis1W, multW;
-      int nEvent, nPileUp, nPriVtxs, mult, partonId, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle, motherId;
+      float rho, pt, eta, axis2, axis1, ptD, bTag, ptDoubleCone, motherMass, pt_dr_log;
+      int nEvent, nPileUp, nPriVtxs, mult, nmult, cmult, partonId, jetIdLevel, nGenJetsInCone, nGenJetsForGenParticle, nJetsForGenParticle, motherId;
       bool matchedJet, balanced;
       std::vector<float> *closebyJetdR, *closebyJetPt;
 
@@ -207,15 +205,12 @@ void qgMiniTuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
       ptD		= (*ptDHandle)[jetRef];*/
     }
 
-    std::tie(mult, ptD, axis2) 	= calcVariables(&*jet, vertexCollection);
+    std::tie(mult, nmult, cmult, ptD, axis2, axis1, pt_dr_log) = calcVariables(&*jet, vertexCollection);
     axis2 			= -std::log(axis2);
+    axis1                       = -std::log(axis1);
     eta				= jet->eta();
 //  qg 				= qglcalc->computeQGLikelihood(pt, eta, rho, {(float) mult, ptD, axis2});
     if(mult < 2) continue;  
-
-    std::tie(multW, ptDW, axis1W, axis2W) 	= calcVariablesPuppi(&*jet, vertexCollection);
-    axis2W 			= -std::log(axis2W);
-    axis1W 			= -std::log(axis1W);
 
     ptDoubleCone = 0;
     for(auto candidate = candidates->begin(); candidate != candidates->end(); ++candidate){
@@ -241,8 +236,12 @@ void qgMiniTuple::beginJob(){
   tree->Branch("pt" ,				&pt,				"pt/F");
   tree->Branch("eta",				&eta,				"eta/F");
   tree->Branch("axis2",				&axis2,				"axis2/F");
+  tree->Branch("axis1",                         &axis1,                         "axis1/F");
   tree->Branch("ptD",				&ptD,				"ptD/F");
   tree->Branch("mult",				&mult,				"mult/I");
+  tree->Branch("nmult",                         &nmult,                         "nmult/I");
+  tree->Branch("cmult",                         &cmult,                         "cmult/I");
+  tree->Branch("pt_dr_log",                     &pt_dr_log,                     "pt_dr_log/F");
   tree->Branch("bTag",				&bTag,				"bTag/F");
   tree->Branch("partonId",			&partonId,			"partonId/I");
   tree->Branch("motherId",			&motherId,			"motherId/I");
@@ -256,11 +255,6 @@ void qgMiniTuple::beginJob(){
   tree->Branch("nJetsForGenParticle",   	&nJetsForGenParticle,   	"nJetsForGenParticle/I");
   tree->Branch("closebyJetdR",			"vector<float>",		&closebyJetdR);
   tree->Branch("closebyJetPt",			"vector<float>",		&closebyJetPt);
-  // puppi
-  tree->Branch("axis1W",			&axis1W,			"axis1W/F");
-  tree->Branch("axis2W",			&axis2W,			"axis2W/F");
-  tree->Branch("ptDW",				&ptDW,				"ptDW/F");
-  tree->Branch("multW",				&multW,				"multW/F");
 }
 
 
@@ -303,9 +297,10 @@ bool qgMiniTuple::isPackedCandidate(const reco::Candidate* candidate){
 /* 
  * Calculation of axis2, mult and ptD
  */
-std::tuple<int, float, float> qgMiniTuple::calcVariables(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC){
+std::tuple<int, int, int, float, float, float, float> qgMiniTuple::calcVariables(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC){
   float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
-  int mult = 0;
+  int mult = 0, nmult = 0, cmult = 0;
+  float pt_dr_log = 0;
 
   //Loop over the jet constituents
   for(auto daughter : jet->getJetConstituentsQuick()){
@@ -316,12 +311,24 @@ std::tuple<int, float, float> qgMiniTuple::calcVariables(const reco::Jet *jet, e
         if(!(part->fromPV() > 1 && part->trackHighPurity())) continue;
         if(useQC){
           if((part->dz()*part->dz())/(part->dzError()*part->dzError()) > 25.) continue;
-          if((part->dxy()*part->dxy())/(part->dxyError()*part->dxyError()) < 25.) ++mult;
-        } else ++mult;
+          if((part->dxy()*part->dxy())/(part->dxyError()*part->dxyError()) < 25.){
+	    ++mult;
+	    ++cmult;
+	  }
+	} else {
+	  ++mult;
+	  ++cmult;
+	}
       } else {
         if(part->pt() < 1.0) continue;
         ++mult;
+	++nmult;
       }
+
+      //Calculate pt_dr_log                                                                                                                                 
+      float dr = reco::deltaR(*jet, *part);
+      pt_dr_log += std::log(part->pt()/dr);
+
     } else {
       auto part = static_cast<const reco::PFCandidate*>(daughter);
 
@@ -340,11 +347,18 @@ std::tuple<int, float, float> qgMiniTuple::calcVariables(const reco::Jet *jet, e
           float dz_sigma_square = pow(itrk->dzError(),2) + pow(vtxClose->zError(),2);
           float d0_sigma_square = pow(itrk->d0Error(),2) + pow(vtxClose->xError(),2) + pow(vtxClose->yError(),2);
           if(dz*dz/dz_sigma_square > 25.) continue;
-          if(d0*d0/d0_sigma_square < 25.) ++mult;
-        } else ++mult;
+          if(d0*d0/d0_sigma_square < 25.) {
+	    ++mult;
+	    ++cmult;
+	  }
+	} else{
+	  ++mult;
+	  ++cmult;
+	}
       } else {														//No track --> neutral particle
         if(part->pt() < 1.0) continue;											//Only use neutrals with pt > 1 GeV
         ++mult;
+	++nmult;
       }
     }
 
@@ -376,55 +390,11 @@ std::tuple<int, float, float> qgMiniTuple::calcVariables(const reco::Jet *jet, e
   }
   float delta = sqrt(fabs((a-b)*(a-b)+4*c*c));
   float axis2 = (a+b-delta > 0 ?  sqrt(0.5*(a+b-delta)) : 0);
+  float axis1 = (a+b+delta > 0 ?  sqrt(0.5*(a+b+delta)) : 0);
   float ptD   = (sum_weight > 0 ? sqrt(sum_weight)/sum_pt : 0);
-  return std::make_tuple(mult, ptD, axis2);
+  return std::make_tuple(mult, nmult, cmult,  ptD, axis2, axis1, pt_dr_log);
 }
 
-std::tuple<float, float, float,float > qgMiniTuple::calcVariablesPuppi(const reco::Jet *jet, edm::Handle<reco::VertexCollection>& vC){
-  float sum_weight = 0., sum_deta = 0., sum_dphi = 0., sum_deta2 = 0., sum_dphi2 = 0., sum_detadphi = 0., sum_pt = 0.;
-  float mult = 0;
-
-  //Loop over the jet constituents
-  for(auto daughter : jet->getJetConstituentsQuick()){
-
-      auto part = static_cast<const pat::PackedCandidate*>(daughter);
-
-      float w= part->puppiWeight();
-
-    mult += w;
-
-    float deta   = daughter->eta() - jet->eta();
-    float dphi   = reco::deltaPhi(daughter->phi(), jet->phi());
-    float partPt = daughter->pt();
-    float weight = partPt*partPt*w;
-
-    sum_weight   += weight;
-    sum_pt       += partPt * w;
-    sum_deta     += deta*weight;
-    sum_dphi     += dphi*weight;
-    sum_deta2    += deta*deta*weight;
-    sum_detadphi += deta*dphi*weight;
-    sum_dphi2    += dphi*dphi*weight;
-  }
-
-  //Calculate axis2 and ptD
-  float a = 0., b = 0., c = 0.;
-  float ave_deta = 0., ave_dphi = 0., ave_deta2 = 0., ave_dphi2 = 0.;
-  if(sum_weight > 0){
-    ave_deta  = sum_deta/sum_weight;
-    ave_dphi  = sum_dphi/sum_weight;
-    ave_deta2 = sum_deta2/sum_weight;
-    ave_dphi2 = sum_dphi2/sum_weight;
-    a         = ave_deta2 - ave_deta*ave_deta;                          
-    b         = ave_dphi2 - ave_dphi*ave_dphi;                          
-    c         = -(sum_detadphi/sum_weight - ave_deta*ave_dphi);                
-  }
-  float delta = sqrt(fabs((a-b)*(a-b)+4*c*c));
-  float axis2 = (a+b-delta > 0 ?  sqrt(0.5*(a+b-delta)) : 0);
-  float axis1 = (a+b-delta > 0 ?  sqrt(0.5*(a+b+delta)) : 0);
-  float ptD   = (sum_weight > 0 ? sqrt(sum_weight)/sum_pt : 0);
-  return std::make_tuple(mult, ptD, axis1,axis2);
-}
 
 
 /*

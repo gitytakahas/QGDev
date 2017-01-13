@@ -360,6 +360,10 @@ std::tuple<int, int, int, float, float, float, float> qgMiniTuple::calcVariables
         ++mult;
 	++nmult;
       }
+
+      //Calculate pt_dr_log                                                                                                                                 
+      float dr = reco::deltaR(*jet, *part);
+      pt_dr_log += std::log(part->pt()/dr);
     }
 
     float deta   = daughter->eta() - jet->eta();

@@ -9,6 +9,7 @@ config.section_('General')
 config.section_('JobType')
 config.JobType.psetName    = 'qgMiniTupleForMiniAOD_cfg.py'
 config.JobType.pluginName  = 'analysis'
+config.JobType.inputFiles=['jec']
 config.JobType.outputFiles = ['qgMiniTuple.root']
 config.JobType.allowUndistributedCMSSW = True 
 
